@@ -71,8 +71,8 @@ async function deployNFT() {
         console.log("\n📦 Deploying NFT contract...");
 
         const transaction = new TokenCreateTransaction()
-            .setTokenName("Odin Genesis NFT")
-            .setTokenSymbol("ODINNFT")
+            .setTokenName("Odin")
+            .setTokenSymbol("ODIN")
             .setTokenType(TokenType.NonFungibleUnique)
             .setTreasuryAccountId(process.env.OPERATOR_ID)
             .setAdminKey(adminKey)

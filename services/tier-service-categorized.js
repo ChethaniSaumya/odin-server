@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 require("dotenv").config();
+const { updateFileOnGitHub } = require('./githubHelper');
 
 class TierServiceCategorized {
     constructor() {
@@ -89,23 +90,33 @@ class TierServiceCategorized {
 
     saveMintedTrackerSync() {
         try {
-            const fs = require('fs');
+            const fsSync = require('fs');
             const dataDir = path.join(__dirname, 'data');
 
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
+            if (!fsSync.existsSync(dataDir)) {
+                fsSync.mkdirSync(dataDir, { recursive: true });
             }
 
             const content = JSON.stringify(this.mintedTracker, null, 2);
-            fs.writeFileSync(this.mintedTrackerFile, content);
+            fsSync.writeFileSync(this.mintedTrackerFile, content);
             console.log('💾 Minted tracker saved locally (sync)');
 
-            // Trigger async GitHub update (fire and forget)
-            this.updateGitHubAsync(content);
+            // ✅ UPDATE GITHUB (async, fire and forget)
+            updateFileOnGitHub(
+                this.githubTrackerPath,
+                content,
+                `Update minted tracker: ${new Date().toISOString()}`
+            ).then(() => {
+                console.log('☁️ Minted tracker synced to GitHub');
+            }).catch((error) => {
+                console.error('⚠️ GitHub sync failed:', error.message);
+            });
+
         } catch (error) {
             console.error('Error saving minted tracker:', error.message);
         }
     }
+
 
     async updateGitHubAsync(content) {
         try {
@@ -188,9 +199,9 @@ class TierServiceCategorized {
 
             // Save locally
             await fs.writeFile(this.mintedTrackerFile, content);
-            console.log('💾 Minted tracker saved locally');
+            console.log('💾 Minted tracker saved locally (async)');
 
-            // Update on GitHub
+            // ✅ UPDATE GITHUB
             try {
                 await updateFileOnGitHub(
                     this.githubTrackerPath,
@@ -199,9 +210,9 @@ class TierServiceCategorized {
                 );
                 console.log('☁️ Minted tracker synced to GitHub');
             } catch (githubError) {
-                console.error('⚠️ Failed to sync to GitHub:', githubError.message);
-                // Don't throw - local save succeeded
+                console.error('⚠️ GitHub sync failed:', githubError.message);
             }
+
         } catch (error) {
             console.error('Error saving minted tracker:', error.message);
         }

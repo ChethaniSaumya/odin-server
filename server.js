@@ -393,7 +393,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         const perNFTCost = amountSentHbar / quantity;
 
         //const expectedPrices = { common: 14, rare: 72, legendary: 220 };
-        const expectedPrices = { common: 1, rare: 2, legendary: 3 };
+        const expectedPrices = { common: 1400, rare: 7200, legendary: 22000 };
         const expectedPrice = expectedPrices[rarity];
         const tolerance = expectedPrice * 0.01;
         const priceDifference = Math.abs(perNFTCost - expectedPrice);
@@ -910,23 +910,23 @@ app.get('/api/mint/pricing', async (req, res) => {
         const mintService = new MintService();
         const pricing = {
             common: {
-                price: 1,//14, // Changed from "14 HBAR" to 14
+                price: 1400,//14, // Changed from "14 HBAR" to 14
                 //tinybars: new Hbar(14).toTinybars().toString(),
-                tinybars: new Hbar(1).toTinybars().toString(),
+                tinybars: new Hbar(1400).toTinybars().toString(),
                 odinAllocation: 40000,
                 available: mintService.getAvailableByRarity('common')
             },
             rare: {
-                price: 2,//72, // Changed from "72 HBAR" to 72
+                price: 7200,//72, // Changed from "72 HBAR" to 72
                 //tinybars: new Hbar(72).toTinybars().toString(),
-                tinybars: new Hbar(3).toTinybars().toString(),
+                tinybars: new Hbar(7200).toTinybars().toString(),
                 odinAllocation: 300000,
                 available: mintService.getAvailableByRarity('rare')
             },
             legendary: {
-                price: 3,//220, // Changed from "220 HBAR" to 220
+                price: 22000,//220, // Changed from "220 HBAR" to 220
                 //tinybars: new Hbar(220).toTinybars().toString(),
-                tinybars: new Hbar(4).toTinybars().toString(),
+                tinybars: new Hbar(22000).toTinybars().toString(),
                 odinAllocation: 1000000,
                 available: mintService.getAvailableByRarity('legendary')
             }

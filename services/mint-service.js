@@ -16,7 +16,7 @@ class MintService {
         this.client = Client.forMainnet()
 
         // FIX: Use the OPERATOR_KEY directly
-        this.privateKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+        this.privateKey = PrivateKey.fromStringDer(process.env.OPERATOR_KEY);
         this.client.setOperator(process.env.OPERATOR_ID, this.privateKey);
 
         this.tokenId = process.env.TOKEN_ID;
@@ -184,7 +184,7 @@ class MintService {
             console.log(`✅ Metadata token IDs:`, metadataTokenIds);
 
             // Use SUPPLY_KEY for minting
-            const supplyKey = PrivateKey.fromString(process.env.SUPPLY_KEY);
+            const supplyKey = PrivateKey.fromStringDer(process.env.SUPPLY_KEY);
 
             // Prepare metadata bytes - STORE IPFS URL, not just token ID
             const allMetadataBytes = [];
@@ -235,7 +235,7 @@ class MintService {
                 .addNftTransfer(this.tokenId, serialNumber, this.treasuryId, userAccountId)
                 .freezeWith(this.client);
 
-            const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+            const operatorKey = PrivateKey.fromStringDer(process.env.OPERATOR_KEY);
             const signedTransferTx = await transferTx.sign(operatorKey);
             const transferResponse = await signedTransferTx.execute(this.client);
             const transferReceipt = await transferResponse.getReceipt(this.client);
@@ -592,11 +592,11 @@ class MintService {
 
             try {
                 // SUPPLY_KEY is DER format (302e...)
-                const supplyKey = PrivateKey.fromString(process.env.SUPPLY_KEY);
+                const supplyKey = PrivateKey.fromStringDer(process.env.SUPPLY_KEY);
                 console.log('   ✅ SUPPLY_KEY parsed (DER format)');
 
                 // OPERATOR_KEY is ECDSA format (0x...)
-                const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+                const operatorKey = PrivateKey.fromStringDer(process.env.OPERATOR_KEY);
                 console.log('   ✅ OPERATOR_KEY parsed (ECDSA format)');
 
                 // Sign with both keys
@@ -629,7 +629,7 @@ class MintService {
                 .freezeWith(this.client);
 
             // Sign transfer with OPERATOR_KEY
-            const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+            const operatorKey = PrivateKey.fromStringDer(process.env.OPERATOR_KEY);
             const transferTxSign = await transferTx.sign(operatorKey);
 
             console.log('⚡ Executing transfer transaction...');

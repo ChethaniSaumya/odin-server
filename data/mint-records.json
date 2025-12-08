@@ -98,5 +98,25 @@
     "timestamp": 1765149507999,
     "isAirdrop": false,
     "mintType": "public_mint"
+  },
+  {
+    "serialNumber": 6,
+    "metadataTokenId": 7,
+    "hederaTokenId": "0.0.10169311",
+    "rarity": "common",
+    "tierName": "Common Warrior",
+    "odinAllocation": 40000,
+    "ownerAccountId": "0.0.10096557",
+    "mintTransactionId": "0.0.10168171@1765191565.739524820",
+    "paymentTransactionHash": "0.0.10096557@1765191552.540872377",
+    "paidAmount": 0.74074626,
+    "paidCurrency": "HBAR",
+    "hbarUsdRate": 0.135713,
+    "metadataUri": "ipfs://bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu/7.json",
+    "ipfsGatewayUrl": "https://ipfs.io/ipfs/bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu/7.json",
+    "mintedAt": "2025-12-08T10:59:43.048Z",
+    "timestamp": 1765191583048,
+    "isAirdrop": false,
+    "mintType": "public_mint"
   }
 ]

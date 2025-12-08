@@ -14,10 +14,15 @@ const {
 } = require("@hashgraph/sdk");
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 const priceService = require('./services/price-service');
 const mintRecorder = require('./services/mint-recorder');
+
+app.use(cors({
+    origin: 'https://min.theninerealms.world',
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
 
 // ==================== MINT ROUTES ====================
 

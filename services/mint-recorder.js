@@ -1,9 +1,11 @@
 const fs = require('fs').promises;
 const path = require('path');
+const { updateFileOnGitHub } = require('./githubHelper');
 
 class MintRecorder {
     constructor() {
         this.recordsFile = path.join(__dirname, '..', 'data', 'mint-records.json');
+        this.githubRecordsPath = 'data/mint-records.json'; // Adjust to match your repo structure
         this.records = [];
         this.loadRecords();
     }
@@ -18,7 +20,7 @@ class MintRecorder {
             console.log(`📚 Loaded ${this.records.length} mint records from file`);
         } catch (error) {
             // File doesn't exist yet, start fresh
-            console.log('📝 No previous mint records found, starting fresh');
+            console.log('🆕 No previous mint records found, starting fresh');
             this.records = [];
         }
     }
@@ -64,7 +66,7 @@ class MintRecorder {
         // Add to records array
         this.records.push(record);
 
-        // Save to file
+        // Save to file AND GitHub
         await this.saveRecords();
 
         console.log(`📝 Recorded mint: Serial #${record.serialNumber}, Metadata ID: ${record.metadataTokenId}`);
@@ -88,7 +90,7 @@ class MintRecorder {
     }
 
     /**
-     * Save records to file
+     * Save records to file AND sync to GitHub
      */
     async saveRecords() {
         try {
@@ -96,14 +98,25 @@ class MintRecorder {
             const dataDir = path.join(__dirname, '..', 'data');
             await fs.mkdir(dataDir, { recursive: true });
 
-            // Write pretty-printed JSON
-            await fs.writeFile(
-                this.recordsFile,
-                JSON.stringify(this.records, null, 2),
-                'utf8'
-            );
+            const content = JSON.stringify(this.records, null, 2);
 
-            console.log(`💾 Saved ${this.records.length} records to ${this.recordsFile}`);
+            // Save locally
+            await fs.writeFile(this.recordsFile, content, 'utf8');
+            console.log(`💾 Saved ${this.records.length} records locally`);
+
+            // ✅ SYNC TO GITHUB
+            try {
+                await updateFileOnGitHub(
+                    this.githubRecordsPath,
+                    content,
+                    `Update mint records: ${this.records.length} total mints - ${new Date().toISOString()}`
+                );
+                console.log('☁️ Mint records synced to GitHub');
+            } catch (githubError) {
+                console.error('⚠️ GitHub sync failed:', githubError.message);
+                // Continue even if GitHub sync fails
+            }
+
         } catch (error) {
             console.error('❌ Failed to save mint records:', error.message);
             throw error;

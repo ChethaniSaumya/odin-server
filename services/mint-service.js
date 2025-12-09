@@ -50,9 +50,9 @@ class MintService {
         */
         // Pricing in HBAR
         this.usdPricing = {
-            common: 100,    // $100
-            rare: 500,      // $500
-            legendary: 1500 // $1500
+            common: 0.1,    // $100
+            rare: 0.2,      // $500
+            legendary: 0.3 // $1500
         };
 
         // Keep for backward compatibility - will be updated dynamically
@@ -63,9 +63,9 @@ class MintService {
         };*/
 
         this.pricing = {
-            common: new Hbar(1400),  // Fallback values
-            rare: new Hbar(7200),
-            legendary: new Hbar(22000)
+            common: new Hbar(1),  // Fallback values
+            rare: new Hbar(2),
+            legendary: new Hbar(3)
         };
 
 
@@ -221,22 +221,22 @@ class MintService {
             // Use SUPPLY_KEY for minting
             const supplyKey = PrivateKey.fromStringDer(process.env.SUPPLY_KEY);
 
-            // Prepare metadata bytes - STORE IPFS URL, not just token ID
+            // Prepare metadata bytes - STORE SERVER URL
             const allMetadataBytes = [];
-            const METADATA_CID = "bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu";
-            let ipfsUrl = '';
+            const METADATA_BASE_URL = "https://min.theninerealms.world/metadata";
+            let metadataUrl = '';
 
             for (let i = 0; i < metadataTokenIds.length; i++) {
                 const tokenId = metadataTokenIds[i];
 
-                // Create the IPFS URL
-                ipfsUrl = `ipfs://${METADATA_CID}/${tokenId}.json`;
+                // Create the server metadata URL
+                metadataUrl = `${METADATA_BASE_URL}/${tokenId}.json`;
 
                 // Convert to bytes (UTF-8 encoded string)
-                const bytes = Uint8Array.from(Buffer.from(ipfsUrl, 'utf8'));
+                const bytes = Uint8Array.from(Buffer.from(metadataUrl, 'utf8'));
                 allMetadataBytes.push(bytes);
 
-                console.log(`📄 Metadata for token #${tokenId}: ${ipfsUrl}`);
+                console.log(`📄 Metadata for token #${tokenId}: ${metadataUrl}`);
             }
 
             // Mint with supply key
@@ -286,10 +286,8 @@ class MintService {
 
             // Mark as minted
             await this.tierService.markAsMinted(rarity, metadataTokenIds);
- 
-            // ============================================
 
-            // Return result WITH IPFS URL
+            // Return result WITH SERVER METADATA URL
             const result = {
                 success: true,
                 tokenId: this.tokenId.toString(),
@@ -298,11 +296,10 @@ class MintService {
                 rarity: rarity,
                 odinAllocation: this.odinAllocation[rarity],
                 transactionId: txResponse.transactionId.toString(),
-                metadataUrl: ipfsUrl,
-                ipfsGatewayUrl: `https://ipfs.io/ipfs/${METADATA_CID}/${metadataTokenIds[0]}.json`
+                metadataUrl: metadataUrl
             };
 
-            console.log(`✅ MINTED: Metadata URL: ${ipfsUrl}`);
+            console.log(`✅ MINTED: Metadata URL: ${metadataUrl}`);
             return result;
 
         } catch (error) {
@@ -311,6 +308,7 @@ class MintService {
             throw new Error(`Minting failed: ${error.message}`);
         }
     }
+
 
     /**
      * Load minting history from file
@@ -367,23 +365,16 @@ class MintService {
         throw new Error('All tokens have been minted');
     }
 
-    /**
-     * Load metadata for a specific token ID
-     */
     async loadMetadata(tokenId) {
         try {
-            // Since metadata is on IPFS, we can either:
-            // 1. Fetch from IPFS (recommended for production)
-            // 2. Load from local files (for testing)
+            const METADATA_BASE_URL = "https://min.theninerealms.world/metadata";
+            const metadataUrl = `${METADATA_BASE_URL}/${tokenId}.json`;
 
-            const METADATA_CID = "bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu";
-            const metadataUrl = `https://ipfs.io/ipfs/${METADATA_CID}/${tokenId}.json`;
-
-            console.log(`📄 Fetching metadata from IPFS: ${metadataUrl}`);
+            console.log(`📄 Fetching metadata from server: ${metadataUrl}`);
 
             const response = await fetch(metadataUrl);
             if (!response.ok) {
-                throw new Error(`Failed to fetch metadata from IPFS: ${response.status}`);
+                throw new Error(`Failed to fetch metadata: ${response.status}`);
             }
 
             const metadata = await response.json();
@@ -391,7 +382,6 @@ class MintService {
 
         } catch (error) {
             console.error(`Failed to load metadata for token ${tokenId}:`, error.message);
-
         }
     }
 
@@ -582,25 +572,22 @@ class MintService {
                     };
                 }
             } else {
-                // Default IPFS metadata
-                const METADATA_CID = "bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu";
-                metadataUri = `ipfs://${METADATA_CID}/${tokenId}.json`;
+                // Default server metadata
+                const METADATA_BASE_URL = "https://min.theninerealms.world/metadata";
+                metadataUri = `${METADATA_BASE_URL}/${tokenId}.json`;
 
-                console.log(`📄 Fetching from IPFS: ${metadataUri}`);
+                console.log(`📄 Fetching from server: ${metadataUri}`);
                 try {
-                    const metadataUrl = `https://ipfs.io/ipfs/${METADATA_CID}/${tokenId}.json`;
-                    const response = await fetch(metadataUrl);
+                    const response = await fetch(metadataUri);
 
                     if (!response.ok) {
-                        throw new Error(`IPFS fetch failed: ${response.status}`);
+                        throw new Error(`Metadata fetch failed: ${response.status}`);
                     }
 
                     originalMetadata = await response.json();
-                    console.log(`✅ Metadata loaded from IPFS`);
-                } catch (ipfsError) {
-                    console.error(`❌ IPFS fetch failed:`, ipfsError.message);
-
-
+                    console.log(`✅ Metadata loaded from server`);
+                } catch (fetchError) {
+                    console.error(`❌ Metadata fetch failed:`, fetchError.message);
                 }
             }
 

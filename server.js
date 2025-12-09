@@ -342,6 +342,12 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
     console.log('\n🎯 VERIFY & MINT ENDPOINT CALLED');
     console.log('================================================');
 
+    // At the very start of the try block, add:
+    console.log('🔍 DEBUG: Starting verify-and-mint');
+    console.log('🔍 DEBUG: TREASURY_ACCOUNT_ID =', process.env.TREASURY_ACCOUNT_ID);
+    console.log('🔍 DEBUG: OPERATOR_ID =', process.env.OPERATOR_ID);
+    console.log('🔍 DEBUG: TOKEN_ID =', process.env.TOKEN_ID);
+
     try {
         const { userAccountId, rarity, quantity, transactionHash } = req.body;
 

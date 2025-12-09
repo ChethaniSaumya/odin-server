@@ -19,7 +19,7 @@ const priceService = require('./services/price-service');
 const mintRecorder = require('./services/mint-recorder');
 
 app.use(cors({
-    origin: ['https://odin-frontend-virid.vercel.app/', 'https://min.theninerealms.world/'],
+    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
     methods: ['GET', 'POST'],
     credentials: true
 }));

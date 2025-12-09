@@ -27,7 +27,7 @@ class MintService {
 
         // Services
         this.tierService = new TierServiceCategorized();
-        this.paymentService = new PaymentService();
+        //this.paymentService = new PaymentService();
 
         // Tracking
         this.mintedTokens = new Set();

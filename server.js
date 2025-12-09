@@ -679,7 +679,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
                         paidCurrency: 'HBAR',
                         hbarUsdRate: currentHbarRate,
                         metadataUrl: result.metadataUrl,
-                        ipfsGatewayUrl: result.ipfsGatewayUrl || `https://ipfs.io/ipfs/bafybeibx4xw6e6r2x5trv4lskhtjqs2y2qfgmajbf6c3k6oohcsmv2cuwu/${result.metadataTokenId}.json`,
+                        metadataGatewayUrl: result.metadataUrl || `https://min.theninerealms.world/metadata/${result.metadataTokenId}.json`,
                         mintedAt: new Date().toISOString(),
                         isAirdrop: false
                     });
@@ -1152,23 +1152,23 @@ app.get('/api/mint/pricing', async (req, res) => {
         const mintService = new MintService();
         const pricing = {
             common: {
-                price: 1400,//14, // Changed from "14 HBAR" to 14
+                price: 1,//14, // Changed from "14 HBAR" to 14
                 //tinybars: new Hbar(14).toTinybars().toString(),
-                tinybars: new Hbar(1400).toTinybars().toString(),
+                tinybars: new Hbar(1).toTinybars().toString(),
                 odinAllocation: 40000,
                 available: mintService.getAvailableByRarity('common')
             },
             rare: {
-                price: 7200,//72, // Changed from "72 HBAR" to 72
+                price: 2,//72, // Changed from "72 HBAR" to 72
                 //tinybars: new Hbar(72).toTinybars().toString(),
-                tinybars: new Hbar(7200).toTinybars().toString(),
+                tinybars: new Hbar(2).toTinybars().toString(),
                 odinAllocation: 300000,
                 available: mintService.getAvailableByRarity('rare')
             },
             legendary: {
-                price: 22000,//220, // Changed from "220 HBAR" to 220
+                price: 3,//220, // Changed from "220 HBAR" to 220
                 //tinybars: new Hbar(220).toTinybars().toString(),
-                tinybars: new Hbar(22000).toTinybars().toString(),
+                tinybars: new Hbar(3).toTinybars().toString(),
                 odinAllocation: 1000000,
                 available: mintService.getAvailableByRarity('legendary')
             }

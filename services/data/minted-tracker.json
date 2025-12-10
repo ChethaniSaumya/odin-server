@@ -4,23 +4,21 @@
     2,
     4,
     6,
-    7
+    8,
+    7,
+    2
   ],
   "rare": [
-    5,
-    9,
-    12,
-    13
+    5
   ],
   "legendary": [
-    3,
-    24
+    3
   ],
   "legendary_1of1": [],
   "nextIndex": {
-    "common": 5,
-    "rare": 4,
-    "legendary": 2,
+    "common": 2,
+    "rare": 0,
+    "legendary": 0,
     "legendary_1of1": 0
   }
 }

@@ -8,7 +8,8 @@
     5,
     9,
     12,
-    13
+    13,
+    16
   ],
   "legendary": [
     3,
@@ -18,7 +19,7 @@
   "legendary_1of1": [],
   "nextIndex": {
     "common": 3,
-    "rare": 4,
+    "rare": 5,
     "legendary": 3,
     "legendary_1of1": 0
   }

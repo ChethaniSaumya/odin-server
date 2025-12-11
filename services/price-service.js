@@ -14,9 +14,9 @@ class PriceService {
         };*/
 
         this.usdPrices = {
-            common: 0.1,
-            rare: 0.2,
-            legendary: 0.3
+            common: 100,
+            rare: 500,
+            legendary: 1500
         };
         
         console.log('💰 PriceService initialized');

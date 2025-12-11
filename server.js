@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require("dotenv").config();
-const fs = require('fs');  
+const fs = require('fs');
 const path = require('path');
 
 const MintService = require('./services/mint-service');
@@ -47,13 +47,13 @@ function saveClaimedWallets(data) {
     if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
     }
-    
+
     const content = JSON.stringify(data, null, 2);
-    
+
     // Save locally
     fs.writeFileSync(claimedFile, content);
     console.log('💾 Claimed wallets saved locally');
-    
+
     // ✅ SYNC TO GITHUB (async, fire and forget)
     updateFileOnGitHub(
         githubClaimedPath,
@@ -82,7 +82,7 @@ app.post('/api/admin/fix-tracker', async (req, res) => {
 
         // Get all mint records
         const allRecords = mintRecorder.getAllRecords();
-        
+
         // Rebuild tracker from records
         const newTracker = {
             common: [],
@@ -118,14 +118,14 @@ app.post('/api/admin/fix-tracker', async (req, res) => {
         // Save to file
         const trackerFile = path.join(__dirname, 'services', 'data', 'minted-tracker.json');
         const dataDir = path.join(__dirname, 'services', 'data');
-        
+
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir, { recursive: true });
         }
-        
+
         const content = JSON.stringify(newTracker, null, 2);
         fs.writeFileSync(trackerFile, content);
-        
+
         // Sync to GitHub
         try {
             await updateFileOnGitHub(
@@ -159,7 +159,7 @@ app.get('/api/airdrop/claim-status/:accountId', async (req, res) => {
     try {
         const { accountId } = req.params;
         const claimedWallets = loadClaimedWallets();
-        
+
         res.json({
             success: true,
             accountId: accountId,
@@ -214,7 +214,7 @@ app.post('/api/airdrop/claim', async (req, res) => {
 
         // Determine which NFTs to mint based on tier
         const nftsToMint = [];
-        
+
         if (tier === 'tier1') {
             nftsToMint.push('common');
         } else if (tier === 'tier2') {
@@ -232,10 +232,10 @@ app.post('/api/airdrop/claim', async (req, res) => {
 
         for (const rarity of nftsToMint) {
             console.log(`\n🎨 Minting ${rarity} NFT...`);
-            
+
             try {
                 const result = await mintService.mintByRarity(userAccountId, rarity);
-                
+
                 mintedNFTs.push({
                     rarity: rarity,
                     serialNumber: result.serialNumber,
@@ -494,19 +494,19 @@ app.get('/api/debug/mint-lock-status', async (req, res) => {
 
         const mintService = new MintService();
         const tierService = mintService.tierService;
-        
-        const lockDuration = tierService.lockAcquiredAt 
+
+        const lockDuration = tierService.lockAcquiredAt
             ? Date.now() - new Date(tierService.lockAcquiredAt).getTime()
             : 0;
-        
+
         res.json({
             success: true,
             isLocked: tierService.mintLock,
             lockedSince: tierService.lockAcquiredAt,
             lockDurationMs: lockDuration,
             lockDurationSeconds: Math.floor(lockDuration / 1000),
-            status: tierService.mintLock 
-                ? `🔒 Locked for ${Math.floor(lockDuration / 1000)}s` 
+            status: tierService.mintLock
+                ? `🔒 Locked for ${Math.floor(lockDuration / 1000)}s`
                 : '🔓 Available'
         });
 
@@ -800,42 +800,31 @@ app.get('/api/mint/check-payment/:accountId', async (req, res) => {
 });
 
 /**
- * NEW APPROACH: Verify transaction hash and mint
+ * ROBUST: Verify transaction hash and mint
  * POST /api/mint/verify-and-mint
- * Body: { userAccountId, rarity, quantity, transactionHash }
  */
 app.post('/api/mint/verify-and-mint', async (req, res) => {
     console.log('\n🎯 VERIFY & MINT ENDPOINT CALLED');
     console.log('================================================');
 
-    // At the very start of the try block, add:
-    console.log('🔍 DEBUG: Starting verify-and-mint');
-    console.log('🔍 DEBUG: TREASURY_ACCOUNT_ID =', process.env.TREASURY_ACCOUNT_ID);
-    console.log('🔍 DEBUG: OPERATOR_ID =', process.env.OPERATOR_ID);
-    console.log('🔍 DEBUG: TOKEN_ID =', process.env.TOKEN_ID);
+    let mintService = null;
+    let mintResults = [];
+    let transactionMarkedUsed = false;
 
     try {
         const { userAccountId, rarity, quantity, transactionHash } = req.body;
 
-        console.log('📥 Request Received:');
-        console.log('   User Account:', userAccountId);
-        console.log('   Rarity:', rarity);
-        console.log('   Quantity:', quantity);
-        console.log('   Transaction Hash:', transactionHash);
-        console.log('================================================\n');
+        console.log('📥 Request:', { userAccountId, rarity, quantity, transactionHash });
 
         // Validate required parameters
         if (!userAccountId || !rarity || !quantity || !transactionHash) {
-            console.log('❌ Missing required parameters');
             return res.status(400).json({
                 success: false,
                 error: 'Missing required parameters: userAccountId, rarity, quantity, transactionHash'
             });
         }
 
-        // Validate rarity
         if (!['common', 'rare', 'legendary'].includes(rarity)) {
-            console.log('❌ Invalid rarity:', rarity);
             return res.status(400).json({
                 success: false,
                 error: 'Invalid rarity. Must be: common, rare, or legendary'
@@ -843,195 +832,116 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         }
 
         const treasuryId = process.env.TREASURY_ACCOUNT_ID || process.env.OPERATOR_ID;
-        console.log(`💰 Treasury: ${treasuryId}`);
-        console.log(`👤 User: ${userAccountId}`);
-        console.log(`🎨 Rarity: ${rarity} x${quantity}`);
 
+        // Normalize transaction ID
         const normalizeTransactionId = (txId) => {
-            console.log('🔧 Normalizing:', txId);
-
-            // Format 1: 0.0.7256495@1764776993.503788243 (WalletConnect/Hedera SDK format)
             if (txId.includes('@')) {
                 const parts = txId.split('@');
                 const accountId = parts[0];
                 const rest = parts[1].split('.');
                 return `${accountId}-${rest[0]}-${rest[1]}`;
             }
-
-            // Format 2: 0.0.7256495-1764775552-702284690 (Mirror Node format)
-            if (txId.includes('-')) {
-                const parts = txId.split('-');
-                if (parts.length === 3) {
-                    return txId;
-                }
-            }
-
             return txId;
         };
 
-        // STEP 1: Check if transaction hash already used
-        console.log('\n📂 STEP 1: Checking if transaction already used...');
-        console.log('================================================');
+        const normalizedInputHash = normalizeTransactionId(transactionHash);
 
-        const fs = require('fs');
-        const path = require('path');
+        // STEP 1: Check if transaction already used
+        console.log('📂 STEP 1: Checking if transaction already used...');
+
         const usedTxFile = path.join(__dirname, 'data', 'used-transactions.json');
-
         let usedTransactions = {};
+
         try {
             const data = fs.readFileSync(usedTxFile, 'utf8');
             usedTransactions = JSON.parse(data);
-            console.log(`   Found ${Object.keys(usedTransactions).length} previously used transactions`);
         } catch (error) {
-            console.log('   No previous transaction file found, creating new one');
             usedTransactions = {};
         }
-
-        const normalizedInputHash = normalizeTransactionId(transactionHash);
 
         const alreadyUsed = Object.keys(usedTransactions).some(key =>
             normalizeTransactionId(key) === normalizedInputHash
         );
 
         if (alreadyUsed) {
-            const usedEntry = Object.entries(usedTransactions).find(([key, value]) =>
-                normalizeTransactionId(key) === normalizedInputHash
-            );
-            console.log('❌ Transaction already used!');
-            console.log('   Used at:', usedEntry[1].timestamp);
-            console.log('================================================\n');
             return res.status(400).json({
                 success: false,
-                error: 'This payment has already been used to mint an NFT',
-                usedAt: usedEntry[1].timestamp
+                error: 'This payment has already been used to mint an NFT'
             });
         }
-        console.log('   ✅ Transaction hash is new and unused');
-        console.log('================================================\n');
 
-        // STEP 2: Wait and fetch transactions from Mirror Node with retry
-        console.log('🔍 STEP 2: Fetching transaction from Mirror Node (with retry)...');
-        console.log('================================================');
-        console.log('   Looking for:', transactionHash);
-        console.log('   Normalized:', normalizedInputHash);
-        console.log('');
+        // STEP 2: Fetch and verify transaction from Mirror Node
+        console.log('🔍 STEP 2: Fetching transaction from Mirror Node...');
 
         let matchingTx = null;
         const maxAttempts = 10;
         const retryDelay = 3000;
-        let lastMirrorData = null;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            console.log(`   Attempt ${attempt}/${maxAttempts}...`);
-
-            const mirrorUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions?account.id=${userAccountId}&transactiontype=CRYPTOTRANSFER&limit=10&order=desc`;
-
             try {
+                const mirrorUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions?account.id=${userAccountId}&transactiontype=CRYPTOTRANSFER&limit=10&order=desc`;
                 const mirrorResponse = await fetch(mirrorUrl);
 
                 if (!mirrorResponse.ok) {
-                    console.log(`   ⚠️ Mirror Node error: ${mirrorResponse.status}`);
                     if (attempt === maxAttempts) {
-                        console.log('================================================\n');
-                        return res.status(500).json({
-                            success: false,
-                            error: 'Failed to fetch transactions from Hedera Mirror Node'
-                        });
+                        return res.status(500).json({ success: false, error: 'Mirror Node error' });
                     }
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     continue;
                 }
 
                 const mirrorData = await mirrorResponse.json();
-                lastMirrorData = mirrorData;
 
                 if (!mirrorData.transactions || mirrorData.transactions.length === 0) {
-                    console.log(`   ⚠️ No transactions found`);
                     if (attempt === maxAttempts) {
-                        console.log('================================================\n');
-                        return res.status(400).json({
-                            success: false,
-                            error: 'No recent transactions found for this wallet'
-                        });
+                        return res.status(400).json({ success: false, error: 'No transactions found' });
                     }
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     continue;
                 }
 
-                console.log(`   Found ${mirrorData.transactions.length} transactions`);
+                matchingTx = mirrorData.transactions.find(tx =>
+                    normalizeTransactionId(tx.transaction_id) === normalizedInputHash
+                );
 
-                matchingTx = mirrorData.transactions.find(tx => {
-                    const normalizedMirrorTx = normalizeTransactionId(tx.transaction_id);
-                    return normalizedMirrorTx === normalizedInputHash;
-                });
+                if (matchingTx) break;
 
-                if (matchingTx) {
-                    console.log(`   ✅ Transaction found!`);
-                    console.log(`   Transaction ID: ${matchingTx.transaction_id}`);
-                    console.log(`   Status: ${matchingTx.result}`);
-                    break;
-                } else {
-                    console.log(`   ⚠️ Transaction not visible in Mirror Node yet`);
-                    if (attempt < maxAttempts) {
-                        console.log(`   ⏳ Waiting ${retryDelay / 1000} seconds before retry...`);
-                        await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    }
+                if (attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
                 }
             } catch (fetchError) {
-                console.log(`   ⚠️ Fetch error:`, fetchError.message);
                 if (attempt === maxAttempts) {
-                    console.log('================================================\n');
-                    return res.status(500).json({
-                        success: false,
-                        error: 'Failed to query Mirror Node'
-                    });
+                    return res.status(500).json({ success: false, error: 'Failed to query Mirror Node' });
                 }
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
         }
 
-        console.log('================================================\n');
-
         if (!matchingTx) {
-            console.log('❌ Transaction not found after all retries');
             return res.status(400).json({
                 success: false,
-                error: 'Transaction not found in Mirror Node after 30 seconds.',
-                debug: {
-                    lookingFor: transactionHash,
-                    normalized: normalizedInputHash
-                }
+                error: 'Transaction not found in Mirror Node'
             });
         }
 
         // STEP 3: Verify transaction details
-        console.log('✅ STEP 3: Verifying transaction details...');
-        console.log('================================================');
+        console.log('✅ STEP 3: Verifying transaction...');
 
         if (matchingTx.result !== 'SUCCESS') {
-            console.log('❌ Transaction status is not SUCCESS');
             return res.status(400).json({
                 success: false,
                 error: `Transaction failed with status: ${matchingTx.result}`
             });
         }
-        console.log('   ✅ Transaction status: SUCCESS');
 
         const transfers = matchingTx.transfers || [];
         const treasuryTransfer = transfers.find(t => t.account === treasuryId && t.amount > 0);
         const userTransfer = transfers.find(t => t.account === userAccountId && t.amount < 0);
 
-        if (!treasuryTransfer) {
+        if (!treasuryTransfer || !userTransfer) {
             return res.status(400).json({
                 success: false,
-                error: 'Transaction does not show a payment to treasury'
-            });
-        }
-
-        if (!userTransfer) {
-            return res.status(400).json({
-                success: false,
-                error: 'Transaction does not show a payment from your account'
+                error: 'Transaction does not show valid payment'
             });
         }
 
@@ -1039,63 +949,30 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         const amountSentHbar = amountSentTinybars / 100000000;
         const perNFTCost = amountSentHbar / quantity;
 
-        // ============================================
-        // DYNAMIC PRICING VERIFICATION
-        // ============================================
-        console.log('\n💰 STEP 3.5: Verifying payment with dynamic pricing...');
-        console.log('================================================');
-
-        // Get dynamic pricing from price service
+        // Verify price
         const dynamicPricing = await priceService.getDynamicPricing();
         const expectedPriceHbar = dynamicPricing.tiers[rarity].hbarPrice;
-        const expectedPriceUsd = dynamicPricing.tiers[rarity].usdPrice;
         const currentHbarRate = dynamicPricing.hbarUsdPrice;
 
-        console.log(`   Current HBAR/USD Rate: $${currentHbarRate}`);
-        console.log(`   Expected Price: $${expectedPriceUsd} = ${expectedPriceHbar} HBAR per NFT`);
-        console.log(`   Amount Sent: ${amountSentHbar} HBAR total`);
-        console.log(`   Per NFT Cost: ${perNFTCost.toFixed(2)} HBAR`);
-
-        // Verify payment with 5% tolerance for price fluctuations
         const verification = await priceService.verifyPaymentAmount(rarity, perNFTCost, 1);
 
-        console.log(`   Min Acceptable: ${verification.minAcceptable.toFixed(2)} HBAR`);
-        console.log(`   Max Acceptable: ${verification.maxAcceptable.toFixed(2)} HBAR`);
-        console.log(`   Payment Valid: ${verification.isValid}`);
-
         if (!verification.isValid) {
-            console.log('❌ Payment amount verification failed');
-            console.log('================================================\n');
             return res.status(400).json({
                 success: false,
-                error: `Payment amount doesn't match. Expected ~${expectedPriceHbar.toFixed(2)} HBAR per NFT ($${expectedPriceUsd}), got ${perNFTCost.toFixed(2)} HBAR`,
-                details: {
-                    expectedHbarPerNFT: expectedPriceHbar,
-                    expectedUsdPerNFT: expectedPriceUsd,
-                    paidHbarPerNFT: perNFTCost,
-                    totalPaidHbar: amountSentHbar,
-                    currentHbarPrice: currentHbarRate,
-                    tolerance: '5%',
-                    minAcceptable: verification.minAcceptable,
-                    maxAcceptable: verification.maxAcceptable
-                }
+                error: `Payment amount mismatch. Expected ~${expectedPriceHbar.toFixed(2)} HBAR, got ${perNFTCost.toFixed(2)} HBAR`
             });
         }
 
-        console.log('   ✅ Price verified with dynamic pricing');
-        console.log('================================================\n');
+        // STEP 4: Mark transaction as used BEFORE minting
+        console.log('💾 STEP 4: Marking transaction as used...');
 
-        // STEP 4: Save transaction hash to prevent reuse
-        console.log('💾 STEP 4: Saving transaction hash...');
         usedTransactions[transactionHash] = {
             userAccountId,
             rarity,
             quantity,
             amountHbar: amountSentHbar,
-            expectedHbar: expectedPriceHbar * quantity,
-            hbarUsdRate: currentHbarRate,
             timestamp: new Date().toISOString(),
-            normalizedHash: normalizedInputHash
+            status: 'pending_mint'
         };
 
         const dataDir = path.join(__dirname, 'data');
@@ -1103,38 +980,58 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
             fs.mkdirSync(dataDir, { recursive: true });
         }
         fs.writeFileSync(usedTxFile, JSON.stringify(usedTransactions, null, 2));
-        console.log('   ✅ Transaction marked as used');
-        console.log('================================================\n');
+        transactionMarkedUsed = true;
 
-        // STEP 5: Mint the NFT(s)
+        // STEP 5: MINT THE NFT(s)
         console.log(`🎨 STEP 5: Minting ${quantity} ${rarity} NFT(s)...`);
-        console.log('================================================');
 
-        const MintService = require('./services/mint-service');
-        const mintService = new MintService();
+        mintService = new MintService();
+        const tierNames = { common: 'Common', rare: 'Rare', legendary: 'Legendary' };
+        const odinAllocations = { common: 40000, rare: 300000, legendary: 1000000 };
 
-        try {
-            const mintResults = [];
+        for (let i = 0; i < quantity; i++) {
+            console.log(`   [${i + 1}/${quantity}] Minting...`);
+            const result = await mintService.mintByRarity(userAccountId, rarity);
+            mintResults.push(result);
+            console.log(`   [${i + 1}/${quantity}] ✅ Serial #${result.serialNumber}`);
+        }
 
-            for (let i = 0; i < quantity; i++) {
-                console.log(`   [${i + 1}/${quantity}] Minting ${rarity} NFT...`);
-                const result = await mintService.mintByRarity(userAccountId, rarity);
-                mintResults.push(result);
-                console.log(`   [${i + 1}/${quantity}] ✅ Minted - Serial: #${result.serialNumber}, Metadata ID: ${result.metadataTokenId}`);
-            }
+        mintService.close();
+        mintService = null;
 
-            mintService.close();
+        // ✅ MINT SUCCESSFUL - Update transaction status
+        usedTransactions[transactionHash].status = 'minted';
+        usedTransactions[transactionHash].serialNumbers = mintResults.map(r => r.serialNumber);
+        fs.writeFileSync(usedTxFile, JSON.stringify(usedTransactions, null, 2));
 
-            console.log('\n================================================');
-            console.log('🎉 ✅ MINTING COMPLETE!');
-            console.log('================================================\n');
+        console.log('🎉 MINTING COMPLETE!');
 
-            // Define tier names and ODIN allocations
-            const tierNames = { common: 'Common', rare: 'Rare', legendary: 'Legendary' };
-            const odinAllocations = { common: 40000, rare: 300000, legendary: 1000000 };
+        // ✅ SEND SUCCESS RESPONSE IMMEDIATELY
+        // Don't let recording failures affect the response
+        const successResponse = {
+            success: true,
+            message: `Successfully minted ${quantity} ${rarity} NFT${quantity > 1 ? 's' : ''}!`,
+            nftDetails: mintResults.map(result => ({
+                tokenId: process.env.TOKEN_ID,
+                serialNumber: result.serialNumber,
+                metadataTokenId: result.metadataTokenId,
+                rarity: rarity,
+                tierName: tierNames[rarity],
+                odinAllocation: odinAllocations[rarity],
+                metadataUrl: result.metadataUrl,
+                transactionId: result.transactionId
+            })),
+            transactionHash: transactionHash,
+            mintedCount: mintResults.length
+        };
 
-            console.log('📝 Recording mints to database...');
+        // Send response FIRST
+        res.json(successResponse);
 
+        // THEN record mints (async, don't block response)
+        console.log('📝 Recording mints (async)...');
+
+        setImmediate(async () => {
             for (const result of mintResults) {
                 try {
                     await mintRecorder.recordMint({
@@ -1151,63 +1048,55 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
                         paidCurrency: 'HBAR',
                         hbarUsdRate: currentHbarRate,
                         metadataUrl: result.metadataUrl,
-                        metadataGatewayUrl: result.metadataUrl || `https://min.theninerealms.world/metadata/${result.metadataTokenId}.json`,
                         mintedAt: new Date().toISOString(),
                         isAirdrop: false
                     });
-                    console.log(`   ✅ Recorded mint for Serial #${result.serialNumber}`);
+                    console.log(`   ✅ Recorded Serial #${result.serialNumber}`);
                 } catch (recordError) {
-                    console.error(`   ⚠️  Failed to record mint:`, recordError.message);
-                    // Continue even if recording fails
+                    console.error(`   ⚠️ Failed to record Serial #${result.serialNumber}:`, recordError.message);
                 }
             }
-            // Build response using mintResults array
-            return res.json({
+        });
+
+    } catch (error) {
+        console.error('❌ VERIFY & MINT ERROR:', error.message);
+        console.error('Stack:', error.stack);
+
+        // Close mint service if open
+        if (mintService) {
+            try { mintService.close(); } catch (e) { }
+        }
+
+        // If minting was successful but we crashed after, still tell user
+        if (mintResults.length > 0) {
+            return res.status(200).json({
                 success: true,
-                message: `Successfully minted ${quantity} ${rarity} NFT${quantity > 1 ? 's' : ''}!`,
+                message: `Minted ${mintResults.length} NFT(s) but had recording error`,
                 nftDetails: mintResults.map(result => ({
                     tokenId: process.env.TOKEN_ID,
                     serialNumber: result.serialNumber,
                     metadataTokenId: result.metadataTokenId,
-                    rarity: rarity,
-                    tierName: tierNames[rarity],
-                    odinAllocation: odinAllocations[rarity],
-                    metadataUrl: result.metadataUrl,
-                    transactionId: result.transactionId
+                    rarity: req.body.rarity
                 })),
-                transactionHash: transactionHash,
-                mintedCount: mintResults.length,
-                pricing: {
-                    paidHbar: amountSentHbar,
-                    expectedHbar: expectedPriceHbar * quantity,
-                    hbarUsdRate: currentHbarRate,
-                    usdEquivalent: expectedPriceUsd * quantity
-                }
-            });
-
-        } catch (mintError) {
-            mintService.close();
-            console.error('❌ MINTING FAILED:', mintError.message);
-
-            // Remove transaction from used list since minting failed
-            delete usedTransactions[transactionHash];
-            fs.writeFileSync(usedTxFile, JSON.stringify(usedTransactions, null, 2));
-            console.log('   ℹ️ Transaction removed from used list (minting failed)');
-
-            return res.status(500).json({
-                success: false,
-                error: `Minting failed: ${mintError.message}`,
-                note: 'Your payment was verified but minting failed. Please contact support.',
-                transactionHash: transactionHash
+                warning: 'Recording may have failed, but your NFTs were minted successfully'
             });
         }
 
-    } catch (error) {
-        console.error('❌ VERIFY & MINT ERROR:', error.message);
+        // If transaction was marked used but minting failed, remove it
+        if (transactionMarkedUsed && mintResults.length === 0) {
+            try {
+                const usedTxFile = path.join(__dirname, 'data', 'used-transactions.json');
+                let usedTransactions = JSON.parse(fs.readFileSync(usedTxFile, 'utf8'));
+                delete usedTransactions[req.body.transactionHash];
+                fs.writeFileSync(usedTxFile, JSON.stringify(usedTransactions, null, 2));
+                console.log('   ℹ️ Transaction unmarked (mint failed)');
+            } catch (e) { }
+        }
+
         return res.status(500).json({
             success: false,
-            error: 'Internal server error',
-            details: error.message
+            error: error.message,
+            details: 'Check server logs for more information'
         });
     }
 });

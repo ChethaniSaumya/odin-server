@@ -51,5 +51,15 @@
     "hbarUsdRate": 0.13585,
     "timestamp": "2025-12-10T23:20:55.400Z",
     "normalizedHash": "0.0.10174943-1765408840-752163429"
+  },
+  "0.0.10174943@1765465666.522243064": {
+    "userAccountId": "0.0.10174943",
+    "rarity": "common",
+    "quantity": 1,
+    "amountHbar": 0.78077692,
+    "expectedHbar": 0.78,
+    "hbarUsdRate": 0.12939,
+    "timestamp": "2025-12-11T15:08:00.623Z",
+    "normalizedHash": "0.0.10174943-1765465666-522243064"
   }
 }

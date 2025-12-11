@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 require("dotenv").config();
+const fs = require('fs');  
+const path = require('path');
 
 const MintService = require('./services/mint-service');
 const AirdropService = require('./services/airdrop-service');
@@ -17,9 +19,10 @@ const app = express();
 app.use(express.json());
 const priceService = require('./services/price-service');
 const mintRecorder = require('./services/mint-recorder');
+const claimedFile = path.join(__dirname, 'data', 'claimed-wallets.json');
 
 app.use(cors({
-    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
+    origin: ['http://localhost:3001', 'https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
     methods: ['GET', 'POST'],
     credentials: true
 }));
@@ -27,6 +30,230 @@ app.use(cors({
 // ==================== MINT ROUTES ====================
 
 // ==================== MINT RECORDS ENDPOINTS ====================
+
+// Load claimed wallets
+function loadClaimedWallets() {
+    try {
+        const data = fs.readFileSync(claimedFile, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        return {};
+    }
+}
+
+// Save claimed wallets
+function saveClaimedWallets(data) {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(claimedFile, JSON.stringify(data, null, 2));
+}
+
+/**
+ * Check if user has already claimed
+ * GET /api/airdrop/claim-status/:accountId
+ */
+app.get('/api/airdrop/claim-status/:accountId', async (req, res) => {
+    try {
+        const { accountId } = req.params;
+        const claimedWallets = loadClaimedWallets();
+        
+        res.json({
+            success: true,
+            accountId: accountId,
+            hasClaimed: !!claimedWallets[accountId],
+            claimedAt: claimedWallets[accountId]?.claimedAt || null,
+            tier: claimedWallets[accountId]?.tier || null
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * Claim airdrop NFTs
+ * POST /api/airdrop/claim
+ * Body: { userAccountId: "0.0.xxx", tier: "tier1" | "tier2" | "tier3" }
+ */
+app.post('/api/airdrop/claim', async (req, res) => {
+    console.log('\n🎁 CLAIM AIRDROP ENDPOINT CALLED');
+    console.log('================================================');
+
+    try {
+        const { userAccountId, tier } = req.body;
+
+        // Validate inputs
+        if (!userAccountId || !tier) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing userAccountId or tier'
+            });
+        }
+
+        if (!['tier1', 'tier2', 'tier3'].includes(tier)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid tier. Must be tier1, tier2, or tier3'
+            });
+        }
+
+        console.log(`👤 User: ${userAccountId}`);
+        console.log(`🎯 Tier: ${tier}`);
+
+        // Check if already claimed
+        const claimedWallets = loadClaimedWallets();
+        if (claimedWallets[userAccountId]) {
+            console.log('❌ Already claimed');
+            return res.status(400).json({
+                success: false,
+                error: 'You have already claimed your airdrop'
+            });
+        }
+
+        // Determine which NFTs to mint based on tier
+        const nftsToMint = [];
+        
+        if (tier === 'tier1') {
+            nftsToMint.push('common');
+        } else if (tier === 'tier2') {
+            nftsToMint.push('common', 'rare');
+        } else if (tier === 'tier3') {
+            nftsToMint.push('common', 'rare', 'legendary');
+        }
+
+        console.log(`📦 NFTs to mint: ${nftsToMint.join(', ')}`);
+
+        // Mint each NFT
+        const mintService = new MintService();
+        const mintedNFTs = [];
+        const errors = [];
+
+        for (const rarity of nftsToMint) {
+            console.log(`\n🎨 Minting ${rarity} NFT...`);
+            
+            try {
+                const result = await mintService.mintByRarity(userAccountId, rarity);
+                
+                mintedNFTs.push({
+                    rarity: rarity,
+                    serialNumber: result.serialNumber,
+                    metadataTokenId: result.metadataTokenId,
+                    transactionId: result.transactionId
+                });
+
+                console.log(`   ✅ Minted ${rarity} - Serial #${result.serialNumber}`);
+
+                // Record mint
+                try {
+                    const odinAllocations = { common: 40000, rare: 300000, legendary: 1000000 };
+                    await mintRecorder.recordMint({
+                        serialNumber: result.serialNumber,
+                        metadataTokenId: result.metadataTokenId,
+                        tokenId: process.env.TOKEN_ID,
+                        rarity: rarity,
+                        odinAllocation: odinAllocations[rarity],
+                        owner: userAccountId,
+                        userAccountId: userAccountId,
+                        transactionId: result.transactionId,
+                        paymentTransactionHash: null,
+                        paidAmount: 0,
+                        paidCurrency: 'AIRDROP_CLAIM',
+                        hbarUsdRate: 0,
+                        metadataUrl: result.metadataUrl,
+                        mintedAt: new Date().toISOString(),
+                        isAirdrop: true
+                    });
+                } catch (recordError) {
+                    console.error(`   ⚠️ Failed to record mint:`, recordError.message);
+                }
+
+            } catch (mintError) {
+                console.error(`   ❌ Failed to mint ${rarity}:`, mintError.message);
+                errors.push({
+                    rarity: rarity,
+                    error: mintError.message
+                });
+            }
+        }
+
+        mintService.close();
+
+        // If at least one NFT was minted, mark as claimed
+        if (mintedNFTs.length > 0) {
+            claimedWallets[userAccountId] = {
+                tier: tier,
+                claimedAt: new Date().toISOString(),
+                nfts: mintedNFTs
+            };
+            saveClaimedWallets(claimedWallets);
+        }
+
+        // Response
+        if (mintedNFTs.length === nftsToMint.length) {
+            // All successful
+            console.log('\n✅ All NFTs claimed successfully!');
+            return res.json({
+                success: true,
+                message: `Successfully claimed ${mintedNFTs.length} NFT(s)!`,
+                nfts: mintedNFTs
+            });
+        } else if (mintedNFTs.length > 0) {
+            // Partial success
+            console.log('\n⚠️ Partial claim - some NFTs failed');
+            return res.json({
+                success: true,
+                message: `Claimed ${mintedNFTs.length}/${nftsToMint.length} NFTs. Some failed.`,
+                nfts: mintedNFTs,
+                errors: errors
+            });
+        } else {
+            // All failed
+            console.log('\n❌ All mints failed');
+            return res.status(500).json({
+                success: false,
+                error: errors[0]?.error || 'Failed to mint NFTs',
+                errors: errors
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ CLAIM ERROR:', error.message);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get all claimed wallets (admin)
+ * GET /api/airdrop/claimed-list
+ */
+app.get('/api/airdrop/claimed-list', async (req, res) => {
+    try {
+        const { adminPassword } = req.query;
+
+        if (adminPassword !== process.env.ADMIN_PASSWORD) {
+            return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        const claimedWallets = loadClaimedWallets();
+        const entries = Object.entries(claimedWallets);
+
+        res.json({
+            success: true,
+            totalClaimed: entries.length,
+            claims: entries.map(([wallet, data]) => ({
+                wallet,
+                ...data
+            }))
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 /**
  * Get all mint records
@@ -1296,23 +1523,23 @@ app.get('/api/mint/pricing', async (req, res) => {
         const mintService = new MintService();
         const pricing = {
             common: {
-                price: 1400,//14, // Changed from "14 HBAR" to 14
+                price: 1,//14, // Changed from "14 HBAR" to 14
                 //tinybars: new Hbar(14).toTinybars().toString(),
-                tinybars: new Hbar(1400).toTinybars().toString(),
+                tinybars: new Hbar(1).toTinybars().toString(),
                 odinAllocation: 40000,
                 available: mintService.getAvailableByRarity('common')
             },
             rare: {
-                price: 7200,//72, // Changed from "72 HBAR" to 72
+                price: 2,//72, // Changed from "72 HBAR" to 72
                 //tinybars: new Hbar(72).toTinybars().toString(),
-                tinybars: new Hbar(7200).toTinybars().toString(),
+                tinybars: new Hbar(2).toTinybars().toString(),
                 odinAllocation: 300000,
                 available: mintService.getAvailableByRarity('rare')
             },
             legendary: {
-                price: 22000,//220, // Changed from "220 HBAR" to 220
+                price: 3,//220, // Changed from "220 HBAR" to 220
                 //tinybars: new Hbar(220).toTinybars().toString(),
-                tinybars: new Hbar(22000).toTinybars().toString(),
+                tinybars: new Hbar(3).toTinybars().toString(),
                 odinAllocation: 1000000,
                 available: mintService.getAvailableByRarity('legendary')
             }

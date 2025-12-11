@@ -7,10 +7,16 @@ class PriceService {
         this.cacheDuration = 5 * 60 * 1000; // 5 minutes cache
         
         // Fixed USD prices for each tier
-        this.usdPrices = {
+       /* this.usdPrices = {
             common: 100,
             rare: 500,
             legendary: 1500
+        };*/
+
+        this.usdPrices = {
+            common: 0.1,
+            rare: 0.2,
+            legendary: 0.3
         };
         
         console.log('💰 PriceService initialized');

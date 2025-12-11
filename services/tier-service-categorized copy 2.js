@@ -349,6 +349,9 @@ class TierServiceCategorized {
         return tokensToReserve;
     }
 
+    /**
+     * Mark tokens as successfully minted
+     */
     async markAsMinted(tier, tokenIds) {
         const tierKey = tier.toLowerCase();
 
@@ -356,18 +359,11 @@ class TierServiceCategorized {
             tokenIds = [tokenIds];
         }
 
-        // Reload from disk first to avoid race conditions
-        this.loadMintedTrackerSync();
-
-        // Add to minted list (avoid duplicates)
-        for (const tokenId of tokenIds) {
-            if (!this.mintedTracker[tierKey].includes(tokenId)) {
-                this.mintedTracker[tierKey].push(tokenId);
-            }
-        }
+        // Add to minted list
+        this.mintedTracker[tierKey].push(...tokenIds);
 
         // Save to file
-        this.saveMintedTrackerSync();
+        await this.saveMintedTracker();
 
         console.log(`✅ Marked ${tokenIds.length} ${tier} token(s) as minted:`, tokenIds);
     }

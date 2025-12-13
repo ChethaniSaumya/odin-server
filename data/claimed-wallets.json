@@ -1,1 +1,26 @@
-
+{
+  "0.0.5128608": {
+    "tier": "tier3",
+    "claimedAt": "2025-12-13T18:10:04.614Z",
+    "nfts": [
+      {
+        "rarity": "common",
+        "serialNumber": 7,
+        "metadataTokenId": 4,
+        "transactionId": "0.0.10178166@1765649359.199943423"
+      },
+      {
+        "rarity": "rare",
+        "serialNumber": 8,
+        "metadataTokenId": 12,
+        "transactionId": "0.0.10178166@1765649371.788047976"
+      },
+      {
+        "rarity": "legendary",
+        "serialNumber": 9,
+        "metadataTokenId": 48,
+        "transactionId": "0.0.10178166@1765649388.321035287"
+      }
+    ]
+  }
+}

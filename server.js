@@ -2037,6 +2037,86 @@ app.post('/api/deploy', async (req, res) => {
 });
 
 /**
+ * Emergency fix for tracker issues
+ * POST /api/admin/fix-tracker-emergency
+ */
+app.post('/api/admin/fix-tracker-emergency', async (req, res) => {
+    try {
+        const { adminPassword } = req.body;
+
+        if (adminPassword !== process.env.ADMIN_PASSWORD) {
+            return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        console.log('🚨 EMERGENCY TRACKER FIX');
+        
+        // Get all mint records
+        const allRecords = mintRecorder.getAllRecords();
+        
+        // Create new tracker from mint records
+        const newTracker = {
+            common: [],
+            rare: [],
+            legendary: [],
+            legendary_1of1: [],
+            nextIndex: {
+                common: 0,
+                rare: 0,
+                legendary: 0,
+                legendary_1of1: 0
+            }
+        };
+
+        // Populate from mint records
+        for (const record of allRecords) {
+            const rarity = record.rarity;
+            const tokenId = record.metadataTokenId;
+            
+            if (newTracker[rarity] && !newTracker[rarity].includes(tokenId)) {
+                newTracker[rarity].push(tokenId);
+            }
+        }
+
+        // Sort and update nextIndex
+        for (const tier in newTracker) {
+            if (tier !== 'nextIndex') {
+                newTracker[tier].sort((a, b) => a - b);
+                newTracker.nextIndex[tier] = newTracker[tier].length;
+            }
+        }
+
+        // Save to file
+        const trackerFile = path.join(__dirname, 'services', 'data', 'minted-tracker.json');
+        const dataDir = path.join(__dirname, 'services', 'data');
+        
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+        
+        fs.writeFileSync(trackerFile, JSON.stringify(newTracker, null, 2));
+        
+        // Also update the tier service in memory
+        const mintService = new MintService();
+        mintService.tierService.mintedTracker = newTracker;
+        mintService.close();
+        
+        console.log('✅ Emergency fix completed');
+        console.log('📊 New tracker:', JSON.stringify(newTracker, null, 2));
+        
+        res.json({
+            success: true,
+            message: 'Tracker fixed from mint records',
+            newTracker,
+            recordsProcessed: allRecords.length
+        });
+
+    } catch (error) {
+        console.error('Emergency fix error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * Check deployment status
  * GET /api/deploy/status
  */

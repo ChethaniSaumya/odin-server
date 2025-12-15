@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 require("dotenv").config();
 const { updateFileOnGitHub } = require('./githubHelper');
@@ -7,16 +8,20 @@ class TierServiceCategorized {
     constructor() {
         this.categorizationFile = path.join(__dirname, 'rarity-categorization.json');
         this.mintedTrackerFile = path.join(__dirname, 'data', 'minted-tracker.json');
-        this.githubTrackerPath = 'services/data/minted-tracker.json'; // Adjust to your repo structure
-
-        // Load categorization data
+        this.githubTrackerPath = 'services/data/minted-tracker.json';
+        
+        // Lock mechanism for thread safety
+        this.mintLock = false;
+        this.lockAcquiredAt = null;
+        
+        // Data structures
         this.rarityMapping = {
             common: [],
             rare: [],
             legendary: [],
             legendary_1of1: []
         };
-
+        
         this.mintedTracker = {
             common: [],
             rare: [],
@@ -29,290 +34,319 @@ class TierServiceCategorized {
                 legendary_1of1: 0
             }
         };
-
-        // ✅ Load synchronously in constructor
+        
+        // ✅ Load data synchronously
         this.loadAllDataSync();
         console.log('✅ TierServiceCategorized initialized');
     }
 
+    /**
+     * Thread-safe method to get next token ID
+     */
+    async getNextTokenIdSafe(tier, quantity = 1) {
+        const maxWaitTime = 30000;
+        const startTime = Date.now();
+        
+        // Wait for lock with timeout
+        while (this.mintLock) {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > maxWaitTime) {
+                throw new Error(`Mint timeout: System busy. Please try again.`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        try {
+            // Acquire lock
+            this.mintLock = true;
+            this.lockAcquiredAt = new Date().toISOString();
+            
+            console.log(`🔒 Lock acquired for ${tier} x${quantity}`);
+            
+            // Get next token IDs
+            const result = await this.getNextTokenId(tier, quantity);
+            
+            return result;
+            
+        } finally {
+            // Always release lock
+            this.mintLock = false;
+            this.lockAcquiredAt = null;
+            console.log(`🔓 Lock released`);
+        }
+    }
 
+    /**
+     * Load all data synchronously
+     */
     loadAllDataSync() {
         try {
-            // Load categorization file SYNCHRONOUSLY
-            const fs = require('fs');
-            const catData = fs.readFileSync(this.categorizationFile, 'utf8');
+            // Load categorization
+            const catData = fsSync.readFileSync(this.categorizationFile, 'utf8');
             const categorization = JSON.parse(catData);
-
-            // Map to our tier names
+            
             this.rarityMapping.common = categorization.Common || [];
             this.rarityMapping.rare = categorization.Rare || [];
             this.rarityMapping.legendary = categorization.Legendary || [];
             this.rarityMapping.legendary_1of1 = categorization["Legendary 1-of-1"] || [];
-
+            
             console.log('📊 Rarity mapping loaded:');
             console.log(`   Common: ${this.rarityMapping.common.length} tokens`);
             console.log(`   Rare: ${this.rarityMapping.rare.length} tokens`);
             console.log(`   Legendary: ${this.rarityMapping.legendary.length} tokens`);
             console.log(`   Legendary 1-of-1: ${this.rarityMapping.legendary_1of1.length} tokens`);
-
+            
         } catch (error) {
-            console.error('❌ Error loading categorization file:', error.message);
+            console.error('❌ Error loading categorization:', error.message);
             throw error;
         }
-
-        // Load or create minted tracker SYNCHRONOUSLY
+        
+        // Load minted tracker
         this.loadMintedTrackerSync();
     }
 
+    /**
+     * Load minted tracker synchronously
+     */
     loadMintedTrackerSync() {
         try {
-            const fs = require('fs');
-            const data = fs.readFileSync(this.mintedTrackerFile, 'utf8');
-            this.mintedTracker = JSON.parse(data);
-            console.log('📊 Minted tracker loaded');
-        } catch (error) {
-            console.log('ℹ️ No minted tracker found, creating new one');
+            const data = fsSync.readFileSync(this.mintedTrackerFile, 'utf8');
+            const tracker = JSON.parse(data);
+            
+            // Validate and merge with current structure
             this.mintedTracker = {
-                common: [],
-                rare: [],
-                legendary: [],
-                legendary_1of1: [],
+                common: Array.isArray(tracker.common) ? tracker.common : [],
+                rare: Array.isArray(tracker.rare) ? tracker.rare : [],
+                legendary: Array.isArray(tracker.legendary) ? tracker.legendary : [],
+                legendary_1of1: Array.isArray(tracker.legendary_1of1) ? tracker.legendary_1of1 : [],
                 nextIndex: {
-                    common: 0,
-                    rare: 0,
-                    legendary: 0,
-                    legendary_1of1: 0
+                    common: tracker.nextIndex?.common || 0,
+                    rare: tracker.nextIndex?.rare || 0,
+                    legendary: tracker.nextIndex?.legendary || 0,
+                    legendary_1of1: tracker.nextIndex?.legendary_1of1 || 0
                 }
             };
-            this.saveMintedTrackerSync();
-        }
-    }
-
-    saveMintedTrackerSync() {
-        try {
-            const fsSync = require('fs');
-            const dataDir = path.join(__dirname, 'data');
-
-            if (!fsSync.existsSync(dataDir)) {
-                fsSync.mkdirSync(dataDir, { recursive: true });
-            }
-
-            const content = JSON.stringify(this.mintedTracker, null, 2);
-            fsSync.writeFileSync(this.mintedTrackerFile, content);
-            console.log('💾 Minted tracker saved locally (sync)');
-
-            // ✅ UPDATE GITHUB (async, fire and forget)
-            updateFileOnGitHub(
-                this.githubTrackerPath,
-                content,
-                `Update minted tracker: ${new Date().toISOString()}`
-            ).then(() => {
-                console.log('☁️ Minted tracker synced to GitHub');
-            }).catch((error) => {
-                console.error('⚠️ GitHub sync failed:', error.message);
-            });
-
+            
+            console.log('📊 Minted tracker loaded:');
+            console.log(`   Common minted: ${this.mintedTracker.common.length}`);
+            console.log(`   Rare minted: ${this.mintedTracker.rare.length}`);
+            console.log(`   Legendary minted: ${this.mintedTracker.legendary.length}`);
+            
         } catch (error) {
-            console.error('Error saving minted tracker:', error.message);
+            console.log('🆕 No minted tracker found, creating new one');
+            this.createNewTracker();
         }
     }
 
+    /**
+     * Create new minted tracker
+     */
+    createNewTracker() {
+        this.mintedTracker = {
+            common: [],
+            rare: [],
+            legendary: [],
+            legendary_1of1: [],
+            nextIndex: {
+                common: 0,
+                rare: 0,
+                legendary: 0,
+                legendary_1of1: 0
+            }
+        };
+        this.saveMintedTrackerSync();
+    }
 
-    async updateGitHubAsync(content) {
+    /**
+     * Save minted tracker synchronously with retry
+     */
+    saveMintedTrackerSync() {
+        const maxRetries = 3;
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const dataDir = path.dirname(this.mintedTrackerFile);
+                
+                // Ensure directory exists
+                if (!fsSync.existsSync(dataDir)) {
+                    fsSync.mkdirSync(dataDir, { recursive: true });
+                }
+                
+                // Create backup before saving
+                if (fsSync.existsSync(this.mintedTrackerFile)) {
+                    const backupFile = `${this.mintedTrackerFile}.backup`;
+                    fsSync.copyFileSync(this.mintedTrackerFile, backupFile);
+                }
+                
+                // Save to file
+                const content = JSON.stringify(this.mintedTracker, null, 2);
+                fsSync.writeFileSync(this.mintedTrackerFile, content);
+                
+                console.log(`💾 Minted tracker saved locally (attempt ${attempt}/${maxRetries})`);
+                console.log(`   Common: ${this.mintedTracker.common.length} IDs`);
+                console.log(`   Rare: ${this.mintedTracker.rare.length} IDs`);
+                console.log(`   Legendary: ${this.mintedTracker.legendary.length} IDs`);
+                console.log(`   NextIndex: ${JSON.stringify(this.mintedTracker.nextIndex)}`);
+                
+                // Sync to GitHub (async, don't block)
+                this.syncToGitHubAsync(content);
+                
+                return true;
+                
+            } catch (error) {
+                lastError = error;
+                console.error(`⚠️ Save attempt ${attempt} failed:`, error.message);
+                
+                if (attempt < maxRetries) {
+                    // Wait before retry
+                    setTimeout(() => {}, 100);
+                }
+            }
+        }
+        
+        console.error('❌ All save attempts failed:', lastError.message);
+        throw lastError;
+    }
+
+    /**
+     * Async GitHub sync (fire and forget)
+     */
+    async syncToGitHubAsync(content) {
         try {
             await updateFileOnGitHub(
                 this.githubTrackerPath,
                 content,
-                `Update minted tracker: ${new Date().toISOString()}`
+                `Update minted tracker: ${new Date().toISOString()} - ${Object.values(this.mintedTracker.nextIndex).reduce((a, b) => a + b, 0)} total minted`
             );
             console.log('☁️ Minted tracker synced to GitHub');
         } catch (error) {
-            console.error('⚠️ Failed to sync to GitHub:', error.message);
+            console.error('⚠️ GitHub sync failed:', error.message);
+            // Don't throw - GitHub sync failure shouldn't break minting
         }
     }
 
     /**
-     * Load categorization data and minted tracker
-     */
-    async loadAllData() {
-        try {
-            // Load categorization file
-            const catData = await fs.readFile(this.categorizationFile, 'utf8');
-            const categorization = JSON.parse(catData);
-
-            // Map to our tier names
-            this.rarityMapping.common = categorization.Common || [];
-            this.rarityMapping.rare = categorization.Rare || [];
-            this.rarityMapping.legendary = categorization.Legendary || [];
-            this.rarityMapping.legendary_1of1 = categorization["Legendary 1-of-1"] || [];
-
-            console.log('📊 Rarity mapping loaded:');
-            console.log(`   Common: ${this.rarityMapping.common.length} tokens`);
-            console.log(`   Rare: ${this.rarityMapping.rare.length} tokens`);
-            console.log(`   Legendary: ${this.rarityMapping.legendary.length} tokens`);
-            console.log(`   Legendary 1-of-1: ${this.rarityMapping.legendary_1of1.length} tokens`);
-
-        } catch (error) {
-            console.error('❌ Error loading categorization file:', error.message);
-            throw error;
-        }
-
-        // Load or create minted tracker
-        await this.loadMintedTracker();
-    }
-
-    /**
-     * Load minted tracker from file
-     */
-    async loadMintedTracker() {
-        try {
-            const data = await fs.readFile(this.mintedTrackerFile, 'utf8');
-            this.mintedTracker = JSON.parse(data);
-            console.log('📊 Minted tracker loaded');
-        } catch (error) {
-            console.log('ℹ️ No minted tracker found, creating new one');
-            this.mintedTracker = {
-                common: [],
-                rare: [],
-                legendary: [],
-                legendary_1of1: [],
-                nextIndex: {
-                    common: 0,
-                    rare: 0,
-                    legendary: 0,
-                    legendary_1of1: 0
-                }
-            };
-            await this.saveMintedTracker();
-        }
-    }
-
-    /**
-     * Save minted tracker to file
-     */
-    async saveMintedTracker() {
-        try {
-            const dataDir = path.join(__dirname, 'data');
-            await fs.mkdir(dataDir, { recursive: true });
-
-            const content = JSON.stringify(this.mintedTracker, null, 2);
-
-            // Save locally
-            await fs.writeFile(this.mintedTrackerFile, content);
-            console.log('💾 Minted tracker saved locally (async)');
-
-            // ✅ UPDATE GITHUB
-            try {
-                await updateFileOnGitHub(
-                    this.githubTrackerPath,
-                    content,
-                    `Update minted tracker: ${new Date().toISOString()}`
-                );
-                console.log('☁️ Minted tracker synced to GitHub');
-            } catch (githubError) {
-                console.error('⚠️ GitHub sync failed:', githubError.message);
-            }
-
-        } catch (error) {
-            console.error('Error saving minted tracker:', error.message);
-        }
-    }
-
-    /**
-     * Get next available token ID for a tier
+     * Get next token ID for minting
      */
     async getNextTokenId(tier, quantity = 1) {
         const tierKey = tier.toLowerCase();
-
+        
         if (!this.rarityMapping[tierKey]) {
             throw new Error(`Invalid tier: ${tier}`);
         }
-
-        let startIndex = this.mintedTracker.nextIndex[tierKey] || 0;
+        
+        // Reload tracker to ensure we have latest data
+        this.loadMintedTrackerSync();
+        
+        const startIndex = this.mintedTracker.nextIndex[tierKey] || 0;
         const availableTokens = this.rarityMapping[tierKey];
-
+        
+        console.log(`🔍 getNextTokenId: tier=${tierKey}, startIndex=${startIndex}, totalTokens=${availableTokens.length}`);
+        
+        // Check availability
         if (startIndex + quantity > availableTokens.length) {
-            throw new Error(`Not enough ${tier} tokens available`);
+            throw new Error(`Not enough ${tier} tokens available. Requested: ${quantity}, Available: ${availableTokens.length - startIndex}`);
         }
-
-        // FIX: Get the actual token IDs
+        
+        // Get next token IDs
         const metadataTokenIds = [];
         for (let i = 0; i < quantity; i++) {
-            metadataTokenIds.push(availableTokens[startIndex + i]);
+            const tokenId = availableTokens[startIndex + i];
+            metadataTokenIds.push(tokenId);
         }
-
+        
         console.log(`🎯 Next ${quantity} ${tier} token(s):`, metadataTokenIds);
-
-        // ✅ INCREMENT nextIndex so next mint gets different tokens
+        
+        // Update nextIndex immediately
         this.mintedTracker.nextIndex[tierKey] = startIndex + quantity;
-
+        
+        // Save immediately to prevent double-minting
+        this.saveMintedTrackerSync();
+        
         return {
             metadataTokenIds: metadataTokenIds,
             startIndex: startIndex
         };
     }
 
-    // Add this method to your TierServiceCategorized class:
-    getAvailableTokens(rarity) {
-        if (!this.categorized[rarity]) {
-            return [];
-        }
-
-        // Get all tokens of this rarity
-        const allTokens = this.categorized[rarity];
-
-        // Filter out minted ones
-        const available = allTokens.filter(tokenId =>
-            !this.mintedTokens.has(tokenId)
-        );
-
-        // CRITICAL: Ensure numeric sort (1, 2, 3, 4... NOT 1, 10, 100, 2, 20...)
-        return available.sort((a, b) => a - b);
-    }
-
-    // Update the reserveTokens method:
-    reserveTokens(rarity, quantity) {
-        const availableTokens = this.getAvailableTokens(rarity);
-
-        // DEBUG: Check what's happening
-        console.log(`🔍 reserveTokens(${rarity}, ${quantity}):`, {
-            first10Available: availableTokens.slice(0, 10),
-            taking: availableTokens.slice(0, quantity),
-            totalAvailable: availableTokens.length
-        });
-
-        if (availableTokens.length < quantity) {
-            throw new Error(`Not enough ${rarity} tokens available`);
-        }
-
-        // Reserve the first N tokens
-        const tokensToReserve = availableTokens.slice(0, quantity);
-
-        // Mark as reserved
-        tokensToReserve.forEach(tokenId => {
-            this.reservedTokens.add(tokenId);
-        });
-
-        return tokensToReserve;
-    }
-
     /**
-     * Mark tokens as successfully minted
+     * CRITICAL FIX: Mark tokens as minted (robust version)
      */
     async markAsMinted(tier, tokenIds) {
         const tierKey = tier.toLowerCase();
-
+        
         if (!Array.isArray(tokenIds)) {
             tokenIds = [tokenIds];
         }
+        
+        console.log(`📝 Marking as minted: ${tierKey} - IDs: ${tokenIds.join(', ')}`);
+        
+        // Reload tracker to get current state
+        this.loadMintedTrackerSync();
+        
+        // Add token IDs to minted list (avoid duplicates)
+        let addedCount = 0;
+        for (const tokenId of tokenIds) {
+            if (!this.mintedTracker[tierKey].includes(tokenId)) {
+                this.mintedTracker[tierKey].push(tokenId);
+                addedCount++;
+            } else {
+                console.warn(`⚠️ Token ${tokenId} already in minted list for ${tierKey}`);
+            }
+        }
+        
+        // Sort minted list (numerically)
+        this.mintedTracker[tierKey].sort((a, b) => a - b);
+        
+        // Update nextIndex to match actual minted count
+        this.mintedTracker.nextIndex[tierKey] = this.mintedTracker[tierKey].length;
+        
+        console.log(`📊 Updated ${tierKey}:`);
+        console.log(`   Minted IDs: ${this.mintedTracker[tierKey].slice(-5).join(', ')} (${this.mintedTracker[tierKey].length} total)`);
+        console.log(`   NextIndex: ${this.mintedTracker.nextIndex[tierKey]}`);
+        console.log(`   Added: ${addedCount} new IDs`);
+        
+        // Save with retry logic
+        this.saveMintedTrackerSync();
+        
+        // Verify save was successful
+        this.verifyTrackerConsistency(tierKey);
+        
+        console.log(`✅ Successfully marked ${tokenIds.length} ${tier} token(s) as minted`);
+    }
 
-        // Add to minted list
-        this.mintedTracker[tierKey].push(...tokenIds);
-
-        // Save to file
-        await this.saveMintedTracker();
-
-        console.log(`✅ Marked ${tokenIds.length} ${tier} token(s) as minted:`, tokenIds);
+    /**
+     * Verify tracker consistency
+     */
+    verifyTrackerConsistency(tierKey) {
+        try {
+            // Reload from disk to verify
+            const data = fsSync.readFileSync(this.mintedTrackerFile, 'utf8');
+            const diskTracker = JSON.parse(data);
+            
+            const inMemoryCount = this.mintedTracker[tierKey].length;
+            const diskCount = diskTracker[tierKey]?.length || 0;
+            
+            if (inMemoryCount !== diskCount) {
+                console.error(`❌ Tracker inconsistency detected for ${tierKey}:`);
+                console.error(`   In-memory: ${inMemoryCount} IDs`);
+                console.error(`   On disk: ${diskCount} IDs`);
+                
+                // Try to auto-fix by using the larger count
+                if (inMemoryCount > diskCount) {
+                    console.log('🔄 Auto-fixing: Using in-memory data');
+                    fsSync.writeFileSync(this.mintedTrackerFile, JSON.stringify(this.mintedTracker, null, 2));
+                } else {
+                    console.log('🔄 Auto-fixing: Using disk data');
+                    this.mintedTracker[tierKey] = diskTracker[tierKey] || [];
+                    this.mintedTracker.nextIndex[tierKey] = diskTracker.nextIndex?.[tierKey] || 0;
+                }
+            }
+            
+        } catch (error) {
+            console.error('⚠️ Tracker verification failed:', error.message);
+        }
     }
 
     /**
@@ -321,19 +355,11 @@ class TierServiceCategorized {
     getAvailableCount(tier) {
         const tierKey = tier.toLowerCase();
         if (!this.rarityMapping[tierKey]) return 0;
-
+        
         const totalTokens = this.rarityMapping[tierKey].length;
-        const mintedCount = (this.mintedTracker[tierKey] || []).length;
-
-        return totalTokens - mintedCount;
-    }
-
-    /**
-     * Get all tokens for a tier
-     */
-    getTokensByTier(tier) {
-        const tierKey = tier.toLowerCase();
-        return this.rarityMapping[tierKey] || [];
+        const mintedCount = this.mintedTracker[tierKey]?.length || 0;
+        
+        return Math.max(0, totalTokens - mintedCount);
     }
 
     /**
@@ -341,12 +367,12 @@ class TierServiceCategorized {
      */
     getTierStats() {
         const stats = {};
-
+        
         for (const tier in this.rarityMapping) {
             const total = this.rarityMapping[tier].length;
-            const minted = (this.mintedTracker[tier] || []).length;
-            const available = total - minted;
-
+            const minted = this.mintedTracker[tier]?.length || 0;
+            const available = Math.max(0, total - minted);
+            
             stats[tier] = {
                 total: total,
                 minted: minted,
@@ -354,7 +380,7 @@ class TierServiceCategorized {
                 percentMinted: total > 0 ? ((minted / total) * 100).toFixed(2) : '0.00'
             };
         }
-
+        
         return stats;
     }
 
@@ -386,8 +412,8 @@ class TierServiceCategorized {
                 legendary_1of1: 0
             }
         };
-
-        await this.saveMintedTracker();
+        
+        this.saveMintedTrackerSync();
         console.log('🔄 Minting tracker reset');
     }
 
@@ -396,19 +422,22 @@ class TierServiceCategorized {
      */
     printStatus() {
         const stats = this.getTierStats();
-
-        console.log('\n📊 MINTING STATUS:');
+        
+        console.log('\n📊 MINTING TRACKER STATUS:');
         console.log('═══════════════════════════════════════');
-
+        
         for (const [tier, data] of Object.entries(stats)) {
-            console.log(`${tier.toUpperCase()}:`);
-            console.log(`   Total: ${data.total}`);
-            console.log(`   Minted: ${data.minted}`);
-            console.log(`   Available: ${data.available}`);
-            console.log(`   Next available ID: ${this.rarityMapping[tier][this.mintedTracker.nextIndex[tier]] || 'N/A'}`);
-            console.log('');
+            if (tier !== 'nextIndex') {
+                console.log(`${tier.toUpperCase()}:`);
+                console.log(`   Total: ${data.total}`);
+                console.log(`   Minted: ${data.minted}`);
+                console.log(`   Available: ${data.available}`);
+                console.log(`   Next Index: ${this.mintedTracker.nextIndex[tier]}`);
+                console.log(`   Last 3 minted: ${this.mintedTracker[tier].slice(-3).join(', ') || 'None'}`);
+                console.log('');
+            }
         }
-
+        
         console.log('═══════════════════════════════════════\n');
     }
 }

@@ -22,5 +22,17 @@
         "transactionId": "0.0.10178166@1765649388.321035287"
       }
     ]
+  },
+  "0.0.4144458": {
+    "tier": "tier1",
+    "claimedAt": "2025-12-15T19:14:50.799Z",
+    "nfts": [
+      {
+        "rarity": "common",
+        "serialNumber": 12,
+        "metadataTokenId": 8,
+        "transactionId": "0.0.10178166@1765826072.429730830"
+      }
+    ]
   }
 }

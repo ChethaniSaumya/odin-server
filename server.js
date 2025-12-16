@@ -1263,43 +1263,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         console.log('🎉 MINTING COMPLETE!');
 
-        // ✅ STEP 6: RECORD ALL MINTS (BEFORE SENDING RESPONSE)
-        console.log('📝 STEP 6: Recording mints...');
-
-        const recordingErrors = [];
-
-        for (let i = 0; i < mintResults.length; i++) {
-            const result = mintResults[i];
-
-            try {
-                await mintRecorder.recordMint({
-                    serialNumber: result.serialNumbers ? result.serialNumbers[0] : result.serialNumber,
-                    metadataTokenId: result.tokens ? result.tokens[0] : result.metadataTokenId,
-                    tokenId: process.env.TOKEN_ID,
-                    rarity: rarity,
-                    odinAllocation: odinAllocations[rarity],
-                    owner: userAccountId,
-                    userAccountId: userAccountId,
-                    transactionId: result.transactionId,
-                    paymentTransactionHash: transactionHash,
-                    paidAmount: amountSentHbar,
-                    paidCurrency: 'HBAR',
-                    hbarUsdRate: currentHbarRate,
-                    metadataUrl: result.metadataUrls ? result.metadataUrls[0] : result.metadataUrl,
-                    mintedAt: new Date().toISOString(),
-                    isAirdrop: false
-                });
-                console.log(`   ✅ Recorded Serial #${result.serialNumbers ? result.serialNumbers[0] : result.serialNumber}`);
-            } catch (recordError) {
-                console.error(`   ❌ Failed to record Serial #${result.serialNumbers ? result.serialNumbers[0] : result.serialNumber}:`, recordError.message);
-                recordingErrors.push({
-                    serial: result.serialNumbers ? result.serialNumbers[0] : result.serialNumber,
-                    error: recordError.message
-                });
-            }
-        }
-
-        // ✅ STEP 7: BUILD RESPONSE
+        // ✅ BUILD AND SEND RESPONSE IMMEDIATELY (DON'T WAIT FOR RECORDING)
         const successResponse = {
             success: true,
             message: `Successfully minted ${quantity} ${rarity} NFT${quantity > 1 ? 's' : ''}!`,
@@ -1317,14 +1281,46 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
             mintedCount: mintResults.length
         };
 
-        // Add warning if some recordings failed
-        if (recordingErrors.length > 0) {
-            successResponse.warning = `${recordingErrors.length} recording(s) failed but NFTs were minted successfully`;
-            successResponse.recordingErrors = recordingErrors;
-        }
-
-        // ✅ SEND RESPONSE
+        // ✅ SEND RESPONSE FIRST (NO BLOCKING)
         res.json(successResponse);
+
+        // ✅ THEN RECORD MINTS ASYNCHRONOUSLY (NON-BLOCKING)
+        console.log('📝 Recording mints (async)...');
+
+        setImmediate(async () => {
+            for (let i = 0; i < mintResults.length; i++) {
+                const result = mintResults[i];
+
+                try {
+                    await mintRecorder.recordMint({
+                        serialNumber: result.serialNumbers ? result.serialNumbers[0] : result.serialNumber,
+                        metadataTokenId: result.tokens ? result.tokens[0] : result.metadataTokenId,
+                        tokenId: process.env.TOKEN_ID,
+                        rarity: rarity,
+                        odinAllocation: odinAllocations[rarity],
+                        owner: userAccountId,
+                        userAccountId: userAccountId,
+                        transactionId: result.transactionId,
+                        paymentTransactionHash: transactionHash,
+                        paidAmount: amountSentHbar,
+                        paidCurrency: 'HBAR',
+                        hbarUsdRate: currentHbarRate,
+                        metadataUrl: result.metadataUrls ? result.metadataUrls[0] : result.metadataUrl,
+                        mintedAt: new Date().toISOString(),
+                        isAirdrop: false
+                    });
+                    console.log(`   ✅ Recorded Serial #${result.serialNumbers ? result.serialNumbers[0] : result.serialNumber}`);
+                } catch (recordError) {
+                    console.error(`   ❌ Failed to record Serial #${result.serialNumbers ? result.serialNumbers[0] : result.serialNumber}:`, recordError.message);
+                }
+
+                // Small delay between recordings to avoid GitHub conflicts
+                if (i < mintResults.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+            console.log('✅ All recordings complete');
+        });
 
     } catch (error) {
         console.error('❌ VERIFY & MINT ERROR:', error.message);

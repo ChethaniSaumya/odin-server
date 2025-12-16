@@ -194,5 +194,25 @@
     "timestamp": 1765904968293,
     "isAirdrop": false,
     "mintType": "public_mint"
+  },
+  {
+    "serialNumber": 5,
+    "metadataTokenId": 9,
+    "hederaTokenId": "0.0.7472332",
+    "rarity": "rare",
+    "tierName": "Rare Champion",
+    "odinAllocation": 300000,
+    "ownerAccountId": "0.0.7464168",
+    "mintTransactionId": "0.0.7463970@1765904944.309638156",
+    "paymentTransactionHash": "0.0.7464168@1765904925.940840889",
+    "paidAmount": 5.22087182,
+    "paidCurrency": "HBAR",
+    "hbarUsdRate": 0.115,
+    "metadataUri": null,
+    "ipfsGatewayUrl": null,
+    "mintedAt": "2025-12-16T17:09:29.975Z",
+    "timestamp": 1765904969975,
+    "isAirdrop": false,
+    "mintType": "public_mint"
   }
 ]

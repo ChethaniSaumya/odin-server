@@ -1,0 +1,22 @@
+[
+  {
+    "serialNumber": 1,
+    "metadataTokenId": 1,
+    "hederaTokenId": "0.0.7473486",
+    "rarity": "common",
+    "tierName": "Common Warrior",
+    "odinAllocation": 40000,
+    "ownerAccountId": "0.0.7464168",
+    "mintTransactionId": "0.0.7463970@1765917882.213283457",
+    "paymentTransactionHash": "0.0.7464168@1765917875.711832238",
+    "paidAmount": 1.76088228,
+    "paidCurrency": "HBAR",
+    "hbarUsdRate": 0.114518,
+    "metadataUri": null,
+    "ipfsGatewayUrl": null,
+    "mintedAt": "2025-12-16T20:44:56.735Z",
+    "timestamp": 1765917896735,
+    "isAirdrop": false,
+    "mintType": "public_mint"
+  }
+]

@@ -280,23 +280,23 @@
     "mintType": "public_mint"
   },
   {
-    "serialNumber": 15,
-    "metadataTokenId": 16,
+    "serialNumber": 16,
+    "metadataTokenId": 10,
     "hederaTokenId": "0.0.7473486",
-    "rarity": "rare",
-    "tierName": "Rare Champion",
-    "odinAllocation": 300000,
-    "ownerAccountId": "0.0.7464168",
-    "mintTransactionId": "0.0.7463970@1765919016.685970293",
-    "paymentTransactionHash": "0.0.7464168@1765918998.304660127",
-    "paidAmount": 8.58088291,
-    "paidCurrency": "HBAR",
-    "hbarUsdRate": 0.07,
+    "rarity": "common",
+    "tierName": "Common Warrior",
+    "odinAllocation": 40000,
+    "ownerAccountId": "0.0.7467364",
+    "mintTransactionId": "0.0.7463970@1765919341.222087852",
+    "paymentTransactionHash": null,
+    "paidAmount": null,
+    "paidCurrency": "AIRDROP",
+    "hbarUsdRate": null,
     "metadataUri": null,
     "ipfsGatewayUrl": null,
-    "mintedAt": "2025-12-16T21:03:47.729Z",
-    "timestamp": 1765919027730,
-    "isAirdrop": false,
-    "mintType": "public_mint"
+    "mintedAt": "2025-12-16T21:09:08.608Z",
+    "timestamp": 1765919348608,
+    "isAirdrop": true,
+    "mintType": "airdrop"
   }
 ]

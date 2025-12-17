@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Git metadata
+.git/
+
+# Environment variables
+.env
+
+# NPM logs
+npm-debug.log
+npm-debug.log.*

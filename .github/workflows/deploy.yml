@@ -1,35 +1,29 @@
 name: Build and Deploy
-
 on:
   push:
     branches:
       - main
-
 env:
   IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/odin-server
   CONTAINER_NAME: odin-server
   PORT: 5000
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: ${{ env.IMAGE_NAME }}:latest,${{ env.IMAGE_NAME }}:${{ github.sha }}
-
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -53,15 +47,26 @@ jobs:
             docker stop ${{ env.CONTAINER_NAME }} || true
             docker rm ${{ env.CONTAINER_NAME }} || true
             
-            # Run the new container
-            # Pass environment variables safely if needed, e.g., via a .env file on the server or -e flags
-            # Here we mount the .env file from the host if it exists is a common pattern, 
-            # Or simplified: specific secrets passed as env (example below shows mounting .env)
-            
+            # Run the new container with environment variables
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
-              -p ${{ env.PORT }}:5000 \
+              -p ${{ env.PORT }}:3000 \
+              -e OPERATOR_ID="${{ secrets.OPERATOR_ID }}" \
+              -e OPERATOR_KEY="${{ secrets.OPERATOR_KEY }}" \
+              -e NETWORK="${{ secrets.NETWORK }}" \
+              -e TOKEN_ID="${{ secrets.TOKEN_ID }}" \
+              -e TREASURY_ACCOUNT_ID="${{ secrets.TREASURY_ACCOUNT_ID }}" \
+              -e ADMIN_KEY="${{ secrets.ADMIN_KEY }}" \
+              -e SUPPLY_KEY="${{ secrets.SUPPLY_KEY }}" \
+              -e PAUSE_KEY="${{ secrets.PAUSE_KEY }}" \
+              -e FEE_SCHEDULE_KEY="${{ secrets.FEE_SCHEDULE_KEY }}" \
+              -e PORT=3000 \
+              -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+              -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+              -e GITHUB_REPO_OWNER="${{ secrets.GITHUB_REPO_OWNER }}" \
+              -e GITHUB_REPO_NAME="${{ secrets.GITHUB_REPO_NAME }}" \
+              -e GITHUB_BRANCH="${{ secrets.GITHUB_BRANCH }}" \
               ${{ env.IMAGE_NAME }}:latest
             
             # Clean up unused images

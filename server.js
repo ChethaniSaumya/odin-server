@@ -25,7 +25,7 @@ const githubSyncService = require('./services/github-sync-service');
 const claimedFile = path.join(__dirname, 'data', 'claimed-wallets.json');
 const githubClaimedPath = 'data/claimed-wallets.json'; // Path in your GitHub repo
 app.use(cors({
-    origin: ['http://localhost:3001', 'https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
+    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
     methods: ['GET', 'POST'],
     credentials: true
 }));
@@ -1066,23 +1066,51 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
             });
         }
 
-        console.log('🔍 STEP 0: Checking token association...');
+        // ✅ SAFETY CHECK: Verify token association (should already be done on frontend)
+        console.log('🔍 SAFETY CHECK: Verifying token association...');
         const isAssociated = await checkTokenAssociation(userAccountId);
 
         if (!isAssociated) {
-            console.log(`❌ User ${userAccountId} has not associated with token`);
+            console.log(`❌ CRITICAL: User ${userAccountId} paid but token not associated!`);
+
+            // Mark transaction as used to prevent retry attempts
+            const usedTxFile = path.join(__dirname, 'data', 'used-transactions.json');
+            let usedTransactions = {};
+            try {
+                const data = fs.readFileSync(usedTxFile, 'utf8');
+                usedTransactions = JSON.parse(data);
+            } catch (e) {
+                usedTransactions = {};
+            }
+
+            usedTransactions[transactionHash] = {
+                userAccountId,
+                rarity,
+                quantity,
+                timestamp: new Date().toISOString(),
+                status: 'failed_no_association',
+                error: 'Token not associated - user needs to associate and contact support for refund or retry'
+            };
+
+            const dataDir = path.join(__dirname, 'data');
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
+            fs.writeFileSync(usedTxFile, JSON.stringify(usedTransactions, null, 2));
+
             return res.status(400).json({
                 success: false,
-                error: 'Token not associated',
-                message: `Please associate your wallet with token ${process.env.TOKEN_ID} before minting.`,
+                error: 'Token not associated - REFUND REQUIRED',
+                message: `Critical error: Payment received but token ${process.env.TOKEN_ID} is not associated with your wallet.\n\nPlease:\n1. Associate your wallet with token ${process.env.TOKEN_ID}\n2. Contact support for assistance\n\nYour transaction: ${transactionHash}`,
                 tokenId: process.env.TOKEN_ID,
                 requiresAssociation: true,
                 refundRequired: true,
-                transactionHash: transactionHash
+                transactionHash: transactionHash,
+                supportContact: process.env.SUPPORT_EMAIL || 'support@theninerealms.world'
             });
         }
 
-        console.log('✅ Token association confirmed');
+        console.log('✅ Token association confirmed (safety check passed)');
 
         const treasuryId = process.env.TREASURY_ACCOUNT_ID || process.env.OPERATOR_ID;
 
@@ -1117,9 +1145,13 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         );
 
         if (alreadyUsed) {
+            const usedTxData = usedTransactions[transactionHash] || usedTransactions[Object.keys(usedTransactions).find(key => normalizeTransactionId(key) === normalizedInputHash)];
+
             return res.status(400).json({
                 success: false,
-                error: 'This payment has already been used to mint an NFT'
+                error: 'This payment has already been used to mint an NFT',
+                usedAt: usedTxData?.timestamp,
+                status: usedTxData?.status
             });
         }
 
@@ -1212,7 +1244,10 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         if (!verification.isValid) {
             return res.status(400).json({
                 success: false,
-                error: `Payment amount mismatch. Expected ~${expectedPriceHbar.toFixed(2)} HBAR, got ${perNFTCost.toFixed(2)} HBAR`
+                error: `Payment amount mismatch. Expected ~${expectedPriceHbar.toFixed(2)} HBAR per NFT, got ${perNFTCost.toFixed(2)} HBAR`,
+                expected: expectedPriceHbar,
+                received: perNFTCost,
+                quantity: quantity
             });
         }
 
@@ -1282,7 +1317,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         // ✅ RECORD ASYNC (AFTER RESPONSE)
         console.log('📝 Recording mints (async)...');
-        
+
         setImmediate(async () => {
             for (let i = 0; i < mintResults.length; i++) {
                 const result = mintResults[i];

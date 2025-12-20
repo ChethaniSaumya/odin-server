@@ -120,13 +120,14 @@
     219,
     224,
     229,
-    255
+    255,
+    260
   ],
   "legendary_1of1": [],
   "nextIndex": {
     "common": 64,
     "rare": 30,
-    "legendary": 23,
+    "legendary": 24,
     "legendary_1of1": 0
   }
 }

@@ -79,7 +79,7 @@ jobs:
               -e SUPPLY_KEY="${{ secrets.SUPPLY_KEY }}" \
               -e PAUSE_KEY="${{ secrets.PAUSE_KEY }}" \
               -e FEE_SCHEDULE_KEY="${{ secrets.FEE_SCHEDULE_KEY }}" \
-              -e FIREBASE_DATABASE_URL="${{https://odin-nft-minting-default-rtdb.firebaseio.com}}" \
+              -e FIREBASE_DATABASE_URL="${{ https://odin-nft-minting-default-rtdb.firebaseio.com }}" \
               -e PORT=${{ env.CONTAINER_PORT }} \
               -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
               -e GB_TOKEN="${{ secrets.GB_TOKEN }}" \

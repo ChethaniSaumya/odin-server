@@ -51,13 +51,15 @@
     94,
     98,
     125,
-    135
+    135,
+    143,
+    158
   ],
   "legendary_1of1": [],
   "nextIndex": {
     "common": 25,
     "rare": 11,
-    "legendary": 12,
+    "legendary": 14,
     "legendary_1of1": 0
   }
 }

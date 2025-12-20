@@ -8,6 +8,8 @@ on:
 env:
   IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/odin-server
   CONTAINER_NAME: odin-server
+  HOST_PORT: 5000
+  CONTAINER_PORT: 3000
 
 jobs:
   build-and-push:
@@ -15,6 +17,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -30,6 +35,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
 
   deploy:
     needs: build-and-push
@@ -44,20 +51,25 @@ jobs:
           timeout: 60s
           command_timeout: 30m
           script: |
-            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }}
-
+            # Login to Docker Hub
+            echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            
+            # Pull the latest image
             docker pull ${{ env.IMAGE_NAME }}:latest
-
-            docker stop ${{ env.CONTAINER_NAME }} || true
-            docker rm ${{ env.CONTAINER_NAME }} || true
-
-            docker network create odin-network || true
-
+            
+            # Stop and remove existing container
+            docker stop ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+            docker rm ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+            
+            # Create network if it doesn't exist
+            docker network create odin-network 2>/dev/null || true
+            
+            # Run the new container
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               --network odin-network \
-              -p 3000:3000 \
+              -p ${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }} \
               -e OPERATOR_ID="${{ secrets.OPERATOR_ID }}" \
               -e OPERATOR_KEY="${{ secrets.OPERATOR_KEY }}" \
               -e NETWORK="${{ secrets.NETWORK }}" \
@@ -67,12 +79,42 @@ jobs:
               -e SUPPLY_KEY="${{ secrets.SUPPLY_KEY }}" \
               -e PAUSE_KEY="${{ secrets.PAUSE_KEY }}" \
               -e FEE_SCHEDULE_KEY="${{ secrets.FEE_SCHEDULE_KEY }}" \
-              -e PORT=3000 \
+              -e PORT=${{ env.CONTAINER_PORT }} \
               -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-              -e GB_TOKEN="${{ secrets.GB_TOKEN }}" \
-              -e GB_REPO_OWNER="${{ secrets.GB_REPO_OWNER }}" \
-              -e GB_REPO_NAME="${{ secrets.GB_REPO_NAME }}" \
-              -e GB_BRANCH="${{ secrets.GB_BRANCH }}" \
+              -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+              -e GITHUB_REPO_OWNER="${{ secrets.GITHUB_REPO_OWNER }}" \
+              -e GITHUB_REPO_NAME="${{ secrets.GITHUB_REPO_NAME }}" \
+              -e GITHUB_BRANCH="${{ secrets.GITHUB_BRANCH }}" \
               ${{ env.IMAGE_NAME }}:latest
+            
+            # Verify container is running
+            docker ps | grep ${{ env.CONTAINER_NAME }}
+            
+            # Show recent logs
+            docker logs --tail 50 ${{ env.CONTAINER_NAME }}
+            
+            # Clean up unused images
+            docker image prune -af --filter "until=24h"
 
-            docker image prune -f
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 30s
+          script: |
+            # Wait for container to be healthy
+            sleep 5
+            
+            # Check if container is running
+            if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+              echo "✅ Container is running"
+              
+              # Test health endpoint
+              curl -f http://localhost:${{ env.HOST_PORT }}/api/mint/test || echo "⚠️ Health check failed"
+            else
+              echo "❌ Container failed to start"
+              docker logs ${{ env.CONTAINER_NAME }}
+              exit 1
+            fi

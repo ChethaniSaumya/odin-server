@@ -39,7 +39,8 @@
     38,
     44,
     45,
-    47
+    47,
+    51
   ],
   "legendary": [
     3,
@@ -56,7 +57,7 @@
   "legendary_1of1": [],
   "nextIndex": {
     "common": 25,
-    "rare": 13,
+    "rare": 14,
     "legendary": 10,
     "legendary_1of1": 0
   }

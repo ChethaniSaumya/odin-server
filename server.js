@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require("dotenv").config();
 const fs = require('fs');
-const path = require('path');
+const path = require('path'); 
 
 const MintService = require('./services/mint-service');
 const AirdropService = require('./services/airdrop-service');
@@ -2901,3 +2901,4 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
+

@@ -47,10 +47,14 @@ jobs:
             docker stop ${{ env.CONTAINER_NAME }} || true
             docker rm ${{ env.CONTAINER_NAME }} || true
             
-            # Run the new container with environment variables
+            # Create odin-network if it doesn't exist
+            docker network create odin-network || true
+            
+            # Run the new container with environment variables and network
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
+              --network odin-network \
               -p ${{ env.PORT }}:3000 \
               -e OPERATOR_ID="${{ secrets.OPERATOR_ID }}" \
               -e OPERATOR_KEY="${{ secrets.OPERATOR_KEY }}" \

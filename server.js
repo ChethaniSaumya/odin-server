@@ -1100,7 +1100,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
             if (error.message === 'MINT_IN_PROGRESS') {
                 return res.status(429).json({
                     success: false,
-                    error: 'You already have a mint in progress. Please wait.'
+                    error: 'You already have a mint in progress. Please wait. If not just refresh and try again'
                 });
             }
             throw error;

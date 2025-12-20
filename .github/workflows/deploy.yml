@@ -85,6 +85,17 @@ jobs:
               -e GB_REPO_OWNER="${{ secrets.GB_REPO_OWNER }}" \
               -e GB_REPO_NAME="${{ secrets.GB_REPO_NAME }}" \
               -e GB_BRANCH="${{ secrets.GB_BRANCH }}" \
+              -e FIREBASE_TYPE="${{ secrets.FIREBASE_TYPE }}" \
+              -e FIREBASE_PROJECT_ID="${{ secrets.FIREBASE_PROJECT_ID }}" \
+              -e FIREBASE_PRIVATE_KEY_ID="${{ secrets.FIREBASE_PRIVATE_KEY_ID }}" \
+              -e FIREBASE_PRIVATE_KEY="${{ secrets.FIREBASE_PRIVATE_KEY }}" \
+              -e FIREBASE_CLIENT_EMAIL="${{ secrets.FIREBASE_CLIENT_EMAIL }}" \
+              -e FIREBASE_CLIENT_ID="${{ secrets.FIREBASE_CLIENT_ID }}" \
+              -e FIREBASE_AUTH_URI="${{ secrets.FIREBASE_AUTH_URI }}" \
+              -e FIREBASE_TOKEN_URI="${{ secrets.FIREBASE_TOKEN_URI }}" \
+              -e FIREBASE_AUTH_PROVIDER_CERT_URL="${{ secrets.FIREBASE_AUTH_PROVIDER_CERT_URL }}" \
+              -e FIREBASE_CLIENT_CERT_URL="${{ secrets.FIREBASE_CLIENT_CERT_URL }}" \
+              -e FIREBASE_UNIVERSE_DOMAIN="${{ secrets.FIREBASE_UNIVERSE_DOMAIN }}" \
               ${{ env.IMAGE_NAME }}:latest
             
             # Verify container is running

@@ -214,10 +214,10 @@ PORT=3000
 ADMIN_PASSWORD=${process.env.ADMIN_PASSWORD || 'admin123'}
 
 # GitHub (optional)
-GITHUB_TOKEN=${process.env.GITHUB_TOKEN || ''}
-GITHUB_REPO_OWNER=${process.env.GITHUB_REPO_OWNER || ''}
-GITHUB_REPO_NAME=${process.env.GITHUB_REPO_NAME || ''}
-GITHUB_BRANCH=${process.env.GITHUB_BRANCH || 'main'}
+GB_TOKEN=${process.env.GB_TOKEN || ''}
+GB_REPO_OWNER=${process.env.GB_REPO_OWNER || ''}
+GB_REPO_NAME=${process.env.GB_REPO_NAME || ''}
+GB_BRANCH=${process.env.GB_BRANCH || 'main'}
 
 # Frontend (optional)
 REACT_APP_WALLETCONNECT_PROJECT_ID=${process.env.REACT_APP_WALLETCONNECT_PROJECT_ID || ''}

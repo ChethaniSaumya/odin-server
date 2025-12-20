@@ -70,22 +70,22 @@ async function updateTransactionStatus(transactionHash, status, additionalData =
 async function acquireMintLock(userAccountId, timeout = 120000) {
     const sanitizedId = userAccountId.replace(/\./g, '_');  // ✅ Replace dots
     const lockRef = realtimeDb.ref(`mint_locks/${sanitizedId}`);
-    
+
     const snapshot = await lockRef.once('value');
     const existingLock = snapshot.val();
-    
+
     if (existingLock) {
         const elapsed = Date.now() - existingLock.timestamp;
         if (elapsed < timeout) {
             throw new Error('MINT_IN_PROGRESS');
         }
     }
-    
+
     await lockRef.set({
         timestamp: Date.now(),
         expiresAt: Date.now() + timeout
     });
-    
+
     setTimeout(async () => {
         await lockRef.remove();
     }, timeout);
@@ -255,7 +255,7 @@ app.post('/api/admin/fix-tracker', async (req, res) => {
 app.get('/api/airdrop/claim-status/:accountId', async (req, res) => {
     try {
         const { accountId } = req.params;
-        
+
         // ✅ Check Firebase instead of file
         const claimedDoc = await db.collection('claimed_wallets').doc(accountId).get();
 
@@ -306,7 +306,7 @@ app.post('/api/airdrop/claim', async (req, res) => {
 
         // ✅ Check if already claimed (Firebase)
         const claimedDoc = await db.collection('claimed_wallets').doc(userAccountId).get();
-        
+
         if (claimedDoc.exists) {
             const data = claimedDoc.data();
             return res.status(400).json({
@@ -420,7 +420,7 @@ app.post('/api/airdrop/claim', async (req, res) => {
         await saveClaimedWallet(userAccountId, {
             tier: tier,
             nfts: mintedNFTs,
-            failedMints: failedMints.length > 0 ? failedMints : undefined
+            ...(failedMints.length > 0 && { failedMints })  // ✅ Only include if not empty
         });
 
         if (mintedNFTs.length === nftsToMint.length) {
@@ -609,7 +609,7 @@ app.get('/api/airdrop/claimed-list', async (req, res) => {
         // ✅ Get from Firebase
         const snapshot = await db.collection('claimed_wallets').get();
         const claims = [];
-        
+
         snapshot.forEach(doc => {
             claims.push({
                 wallet: doc.id,
@@ -1108,9 +1108,9 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         // ✅ STEP 1: Check if transaction already used (Firebase)
         console.log('🔥 STEP 1: Checking Firebase for duplicate transaction...');
-        
+
         const alreadyUsed = await checkTransactionUsed(transactionHash);
-        
+
         if (alreadyUsed) {
             await releaseMintLock(userAccountId);
             return res.status(400).json({
@@ -1125,7 +1125,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         if (!isAssociated) {
             await releaseMintLock(userAccountId);
-            
+
             // Mark transaction as failed
             await markTransactionUsed(transactionHash, {
                 userAccountId,
@@ -1147,7 +1147,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         // ✅ STEP 3: Verify payment from Mirror Node
         console.log('💰 STEP 3: Verifying payment...');
-        
+
         const normalizeTransactionId = (txId) => {
             if (txId.includes('@')) {
                 const parts = txId.split('@');
@@ -1255,7 +1255,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         // ✅ STEP 4: Mark transaction as used in Firebase
         console.log('🔥 STEP 4: Marking transaction in Firebase...');
-        
+
         await markTransactionUsed(transactionHash, {
             userAccountId,
             rarity,
@@ -1270,7 +1270,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         mintService = new MintService();
         // Replace tier service with Firebase version
         mintService.tierService = new TierServiceFirebase();
-        
+
         const tierNames = { common: 'Common', rare: 'Rare', legendary: 'Legendary' };
         const odinAllocations = { common: 40000, rare: 300000, legendary: 1000000 };
 
@@ -1317,7 +1317,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         // Record async
         console.log('📝 Recording mints (async)...');
-        
+
         setImmediate(async () => {
             for (let i = 0; i < mintResults.length; i++) {
                 const result = mintResults[i];
@@ -1351,7 +1351,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
         console.error('❌ VERIFY & MINT ERROR:', error.message);
 
         // Release lock on error
-        await releaseMintLock(req.body.userAccountId).catch(e => {});
+        await releaseMintLock(req.body.userAccountId).catch(e => { });
 
         // Close mint service
         if (mintService) {

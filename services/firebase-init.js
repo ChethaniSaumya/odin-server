@@ -4,11 +4,21 @@ if (!admin.apps.length) {
   // Decode Base64 private key
   let privateKey;
   try {
-    privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString('utf8');
+    // First try Base64 decode (for production)
+    const decoded = Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString('utf8');
+    // Check if it looks like a valid key
+    if (decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+      privateKey = decoded;
+    } else {
+      // Not base64, use as-is with newline replacement
+      privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    }
   } catch (e) {
-    // Fallback for non-base64 encoded key (local development)
+    // Fallback: use as-is with newline replacement
     privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
   }
+
+  console.log('🔑 Private key starts with:', privateKey.substring(0, 30));
   
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -26,7 +36,7 @@ if (!admin.apps.length) {
     }),
     databaseURL: process.env.FIREBASE_DATABASE_URL
   });
-  console.log('🔥 Firebase initialized');
+  console.log('🔥 Firebase initialized successfully');
 }
 
 const db = admin.firestore();

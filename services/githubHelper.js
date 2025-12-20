@@ -1,12 +1,12 @@
 const { Octokit } = require('@octokit/rest');
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const REPO_OWNER = process.env.GITHUB_REPO_OWNER;
-const REPO_NAME = process.env.GITHUB_REPO_NAME;
-const BRANCH = process.env.GITHUB_BRANCH || 'main';
+const GB_TOKEN = process.env.GB_TOKEN;
+const REPO_OWNER = process.env.GB_REPO_OWNER;
+const REPO_NAME = process.env.GB_REPO_NAME;
+const BRANCH = process.env.GB_BRANCH || 'main';
 
 const octokit = new Octokit({
-  auth: GITHUB_TOKEN
+  auth: GB_TOKEN
 });
 
 async function updateFileOnGitHub(filePath, content, commitMessage, retries = 3) {

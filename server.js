@@ -25,7 +25,7 @@ const githubSyncService = require('./services/github-sync-service');
 const claimedFile = path.join(__dirname, 'data', 'claimed-wallets.json');
 const githubClaimedPath = 'data/claimed-wallets.json'; // Path in your GitHub repo
 app.use(cors({
-    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world'],
+    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world', 'https://mint.theninerealms.world'],
     methods: ['GET', 'POST'],
     credentials: true
 }));

@@ -1738,5 +1738,25 @@
     "timestamp": 1766225459724,
     "isAirdrop": false,
     "mintType": "public_mint"
+  },
+  {
+    "serialNumber": 131,
+    "metadataTokenId": 224,
+    "hederaTokenId": "0.0.7473486",
+    "rarity": "legendary",
+    "tierName": "Legendary Hero",
+    "odinAllocation": 1000000,
+    "ownerAccountId": "0.0.7256495",
+    "mintTransactionId": "0.0.7463970@1766225922.138426062",
+    "paymentTransactionHash": "0.0.7256495@1766225914.657442839",
+    "paidAmount": 13.30089854,
+    "paidCurrency": "HBAR",
+    "hbarUsdRate": 0.11286,
+    "metadataUri": null,
+    "ipfsGatewayUrl": null,
+    "mintedAt": "2025-12-20T10:19:14.115Z",
+    "timestamp": 1766225954115,
+    "isAirdrop": false,
+    "mintType": "public_mint"
   }
 ]

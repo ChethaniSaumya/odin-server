@@ -1,12 +1,19 @@
-# Dependencies
-node_modules/
-
-# Git metadata
-.git/
-
-# Environment variables
+# Environment
 .env
+.env.local
 
-# NPM logs
+# Firebase credentials (NEVER commit!)
+firebase-service-account.json
+
+# Data files (now in Firebase)
+data/
+!data/.gitkeep
+
+# Node
+node_modules/
 npm-debug.log
-npm-debug.log.*
+yarn-error.log
+
+# IDE
+.vscode/
+.idea/

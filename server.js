@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require("dotenv").config();
 const fs = require('fs');
-const path = require('path'); 
+const path = require('path');
 
 const MintService = require('./services/mint-service');
 const AirdropService = require('./services/airdrop-service');
@@ -99,9 +99,9 @@ async function releaseMintLock(userAccountId) {
 async function checkTokenAssociation(accountId) {
     try {
         const tokenId = process.env.TOKEN_ID;
-        const mirrorNodeUrl = process.env.NETWORK === 'testnet'
-            ? 'https://testnet.mirrornode.hedera.com'
-            : 'https://testnet.mirrornode.hedera.com';
+        const mirrorNodeUrl = process.env.NETWORK === 'testnet'  // Is 'mainnet' === 'testnet'? NO!
+            ? 'https://testnet.mirrornode.hedera.com'           // ❌ Skipped
+            : 'https://mainnet-public.mirrornode.hedera.com';   // ✅ Used (this one)
 
         const url = `${mirrorNodeUrl}/api/v1/accounts/${accountId}/tokens?token.id=${tokenId}`;
 
@@ -1020,7 +1020,7 @@ app.get('/api/mint/check-payment/:accountId', async (req, res) => {
         const { accountId } = req.params;
 
         // Simple check: Query Mirror Node for user's last transaction
-        const mirrorUrl = `https://testnet.mirrornode.hedera.com/api/v1/transactions?account.id=${accountId}&limit=1&order=desc`;
+        const mirrorUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions?account.id=${accountId}&limit=1&order=desc`;
         const response = await fetch(mirrorUrl);
 
         if (!response.ok) {
@@ -1167,7 +1167,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                const mirrorUrl = `https://testnet.mirrornode.hedera.com/api/v1/transactions?account.id=${userAccountId}&transactiontype=CRYPTOTRANSFER&limit=10&order=desc`;
+                const mirrorUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions?account.id=${userAccountId}&transactiontype=CRYPTOTRANSFER&limit=10&order=desc`;
                 const mirrorResponse = await fetch(mirrorUrl);
 
                 if (!mirrorResponse.ok) {
@@ -1384,7 +1384,7 @@ app.post('/api/mint/verify-and-mint', async (req, res) => {
 app.get('/api/debug/token-info', async (req, res) => {
     try {
         const { TokenInfoQuery } = require("@hashgraph/sdk");
-        const client = Client.forTestnet();
+        const client = Client.forMainnet();
         client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
 
         const query = new TokenInfoQuery()
@@ -1635,7 +1635,7 @@ app.get('/api/simple-transactions/:accountId', async (req, res) => {
         }
 
         // Build SIMPLE URL - NO timestamp filters
-        const mirrorUrl = `https://testnet.mirrornode.hedera.com/api/v1/transactions?account.id=${accountId}&limit=${limit}&order=desc`;
+        const mirrorUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions?account.id=${accountId}&limit=${limit}&order=desc`;
 
         console.log(`🔍 Calling: ${mirrorUrl}`);
 
@@ -1674,7 +1674,7 @@ app.get('/api/simple-transactions/:accountId', async (req, res) => {
                 counterparty: counterparty,
                 fee: (parseInt(tx.charged_tx_fee || 0) / 100000000).toFixed(4) + ' HBAR',
                 status: tx.result === 'SUCCESS' ? 'success' : 'failed',
-                hashscan: `https://hashscan.io/testnet/transaction/${tx.transaction_id}`
+                hashscan: `https://hashscan.io/mainnet/transaction/${tx.transaction_id}`
             };
         });
 
@@ -1920,7 +1920,7 @@ app.get('/api/mint/test', (req, res) => {
     console.log("📝 Account:", process.env.OPERATOR_ID);
 
     // 2. FIXED CLIENT CONFIGURATION
-    const client = Client.forTestnet();
+    const client = Client.forMainnet();
 
     try {
         // IMPROVED KEY PARSING - HANDLES HEX FORMAT
@@ -2034,7 +2034,7 @@ app.get('/api/mint/test', (req, res) => {
         const envContent =
             `OPERATOR_ID=${process.env.OPERATOR_ID}
 OPERATOR_KEY=${process.env.OPERATOR_KEY}
-NETWORK=testnet
+NETWORK=mainnet
 TOKEN_ID=${tokenId.toString()}
 ADMIN_KEY=${adminKey.toString()}
 SUPPLY_KEY=${supplyKey.toString()}
@@ -2070,7 +2070,7 @@ async function deployNFT() {
     console.log("📝 Account:", process.env.OPERATOR_ID);
 
     // 2. CLIENT CONFIGURATION
-    const client = Client.forTestnet();
+    const client = Client.forMainnet();
 
     try {
         // Parse operator key (handle 0x prefix for raw hex)
@@ -2105,7 +2105,7 @@ async function deployNFT() {
         // 4. CREATE TOKEN - ULTRA SIMPLE VERSION
         console.log("📦 Creating NFT token...");
         console.log("⚙️  Configuration:");
-        console.log("   Name: Odin");
+        console.log("   Name: Odin NFT");
         console.log("   Symbol: ODIN");
         console.log("   Type: Non-Fungible Unique");
         console.log("   Treasury:", process.env.OPERATOR_ID);
@@ -2113,7 +2113,7 @@ async function deployNFT() {
         console.log("");
 
         const transaction = new TokenCreateTransaction()
-            .setTokenName("Odin")
+            .setTokenName("Odin NFT")
             .setTokenSymbol("ODIN")
             .setTokenType(TokenType.NonFungibleUnique)
             .setDecimals(0)
@@ -2151,7 +2151,7 @@ async function deployNFT() {
         console.log("🎉 🎉 🎉 NFT DEPLOYED SUCCESSFULLY! 🎉 🎉 🎉");
         console.log("========================================");
         console.log("📝 TOKEN ID:", tokenId.toString());
-        console.log("🔍 HashScan:", `https://hashscan.io/testnet/token/${tokenId.toString()}`);
+        console.log("🔍 HashScan:", `https://hashscan.io/mainnet/token/${tokenId.toString()}`);
         console.log("👤 Treasury:", process.env.OPERATOR_ID);
         console.log("🔑 Supply Key:", supplyKey.toString().substring(0, 40) + "...");
         console.log("========================================\n");
@@ -2162,7 +2162,7 @@ async function deployNFT() {
         const fs = require('fs');
         const envContent = `OPERATOR_ID=${process.env.OPERATOR_ID}
 OPERATOR_KEY=${process.env.OPERATOR_KEY}
-NETWORK=testnet
+NETWORK=mainnet
 TOKEN_ID=${tokenId.toString()}
 SUPPLY_KEY=${supplyKey.toString()}
 TREASURY_ACCOUNT_ID=${process.env.OPERATOR_ID}
@@ -2291,7 +2291,7 @@ app.post('/api/deploy', async (req, res) => {
             return res.json({
                 success: true,
                 message: "Deployment submitted but receipt timed out. Check HashScan for token ID.",
-                checkUrl: "https://hashscan.io/testnet"
+                checkUrl: "https://hashscan.io/mainnet"
             });
         }
 
@@ -2788,7 +2788,7 @@ app.post('/api/upgrade/name', async (req, res) => {
             return res.status(403).json({ error: "Unauthorized" });
         }
 
-        const client = Client.forTestnet();
+        const client = Client.forMainnet();
         client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
         const upgradeService = new UpgradeService(client, process.env.TOKEN_ID);
 
@@ -2807,7 +2807,7 @@ app.post('/api/upgrade/royalties', async (req, res) => {
             return res.status(403).json({ error: "Unauthorized" });
         }
 
-        const client = Client.forTestnet();
+        const client = Client.forMainnet();
         client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
         const upgradeService = new UpgradeService(client, process.env.TOKEN_ID);
 
@@ -2826,7 +2826,7 @@ app.post('/api/upgrade/pause', async (req, res) => {
             return res.status(403).json({ error: "Unauthorized" });
         }
 
-        const client = Client.forTestnet();
+        const client = Client.forMainnet();
         client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
         const upgradeService = new UpgradeService(client, process.env.TOKEN_ID);
 
@@ -2845,7 +2845,7 @@ app.post('/api/upgrade/unpause', async (req, res) => {
             return res.status(403).json({ error: "Unauthorized" });
         }
 
-        const client = Client.forTestnet();
+        const client = Client.forMainnet();
         client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
         const upgradeService = new UpgradeService(client, process.env.TOKEN_ID);
 
@@ -2901,4 +2901,3 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
-

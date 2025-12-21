@@ -10,7 +10,7 @@ const UpgradeService = require('./services/upgrade-service');
 const {
     Client,
     PrivateKey,
-    TokenCreateTransaction 
+    TokenCreateTransaction,
     TokenType,
     Hbar
 } = require("@hashgraph/sdk");
@@ -2901,4 +2901,3 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
-

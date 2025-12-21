@@ -25,7 +25,7 @@ const { admin, db, realtimeDb } = require('./services/firebase-init');
 const TierServiceFirebase = require('./services/tier-service-firebase');
 
 app.use(cors({
-    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world', 'https://mint.theninerealms.world', 'http://localhost:3001'],
+    origin: ['https://odin-frontend-virid.vercel.app', 'https://min.theninerealms.world', 'https://mint.theninerealms.world'],
     methods: ['GET', 'POST'],
     credentials: true
 }));

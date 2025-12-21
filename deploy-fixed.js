@@ -17,7 +17,7 @@ async function deployNFT() {
     console.log("📝 Account:", process.env.OPERATOR_ID);
 
     // 2. CLIENT CONFIGURATION
-    const client = Client.forTestnet();
+    const client = Client.forMainnet();
 
     try {
         // FIXED KEY PARSING - HANDLES 0x ECDSA FORMAT
@@ -88,7 +88,7 @@ async function deployNFT() {
 
         // 4. DEPLOY NFT (WITH PROPER SIGNATURES)
         console.log("\n📦 Creating upgradeable NFT token...");
-        console.log("   Name: Odin");
+        console.log("   Name: Odin NFT");
         console.log("   Symbol: ODIN");
         console.log("   Type: Non-Fungible Unique");
         console.log("   Treasury:", process.env.OPERATOR_ID);
@@ -100,7 +100,7 @@ async function deployNFT() {
         console.log("      Fee Schedule Key: ✅ (update royalties)");
 
         const transaction = new TokenCreateTransaction()
-            .setTokenName("Odin")
+            .setTokenName("Odin NFT")
             .setTokenSymbol("ODIN")
             .setTokenType(TokenType.NonFungibleUnique)
             .setDecimals(0)

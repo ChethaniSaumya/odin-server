@@ -5,7 +5,7 @@ require("dotenv").config();
 
 class PaymentService {
     constructor() {
-        this.client = Client.forTestnet();
+        this.client = Client.forMainnet();
         this.client.setOperator(process.env.OPERATOR_ID, process.env.OPERATOR_KEY);
         
         this.treasuryId = process.env.TREASURY_ACCOUNT_ID || process.env.OPERATOR_ID;
@@ -184,7 +184,7 @@ class PaymentService {
      */
     async getUserLastTransaction(userAccountId, lookbackMinutes = 10) {
         try {
-            const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/transactions`;
+            const mirrorNodeUrl = `https://mainnet-public.mirrornode.hedera.com/api/v1/transactions`;
             
             const params = new URLSearchParams({
                 'account.id': userAccountId,

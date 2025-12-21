@@ -15,7 +15,7 @@ const mintRecorder = require('./mint-recorder');
 
 class MintService {
     constructor() {
-        this.client = Client.forTestnet();
+        this.client = Client.forMainnet();
 
         // Parse OPERATOR_KEY based on format
         const opKey = process.env.OPERATOR_KEY.trim();
@@ -286,9 +286,9 @@ class MintService {
 
     async checkAssociation(accountId) {
         try {
-            const mirrorNodeUrl = process.env.NETWORK === 'testnet'
-                ? 'https://testnet.mirrornode.hedera.com'
-                : 'https://testnet.mirrornode.hedera.com';
+            const mirrorNodeUrl = process.env.NETWORK === 'testnet'  // Is 'mainnet' === 'testnet'? NO!
+                ? 'https://testnet.mirrornode.hedera.com'           // ❌ Skipped
+                : 'https://mainnet-public.mirrornode.hedera.com';   // ✅ Used (this one)
 
             const url = `${mirrorNodeUrl}/api/v1/accounts/${accountId}/tokens?token.id=${this.tokenId}`;
 
@@ -340,23 +340,23 @@ class MintService {
             console.log(`✅ GitHub finalized`);
 
             // ========== PHASE 4: RECORD MINT ==========
-           /* console.log(`\n📝 PHASE 4: Recording mint...`);
-            for (let i = 0; i < reservedTokens.length; i++) {
-                const tokenId = reservedTokens[i];
-                await mintRecorder.recordMint({
-                    serialNumber: mintResult.serialNumbers?.[i] || mintResult.serialNumber + i,
-                    metadataTokenId: tokenId,
-                    tokenId: process.env.TOKEN_ID,
-                    rarity: rarity,
-                    odinAllocation: this.odinAllocation[rarity],
-                    owner: userAccountId,
-                    userAccountId: userAccountId,
-                    transactionId: mintResult.transactionId,
-                    metadataUrl: mintResult.metadataUrls?.[i] || mintResult.metadataUrl,
-                    mintedAt: new Date().toISOString(),
-                    isAirdrop: false
-                });
-            }*/
+            /* console.log(`\n📝 PHASE 4: Recording mint...`);
+             for (let i = 0; i < reservedTokens.length; i++) {
+                 const tokenId = reservedTokens[i];
+                 await mintRecorder.recordMint({
+                     serialNumber: mintResult.serialNumbers?.[i] || mintResult.serialNumber + i,
+                     metadataTokenId: tokenId,
+                     tokenId: process.env.TOKEN_ID,
+                     rarity: rarity,
+                     odinAllocation: this.odinAllocation[rarity],
+                     owner: userAccountId,
+                     userAccountId: userAccountId,
+                     transactionId: mintResult.transactionId,
+                     metadataUrl: mintResult.metadataUrls?.[i] || mintResult.metadataUrl,
+                     mintedAt: new Date().toISOString(),
+                     isAirdrop: false
+                 });
+             }*/
 
             console.log(`\n🎉 MINT COMPLETE SUCCESSFULLY!`);
             console.log(`   Tokens: ${reservedTokens.join(', ')}`);

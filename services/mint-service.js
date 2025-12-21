@@ -57,9 +57,9 @@ class MintService {
         */
         // Pricing in HBAR
         this.usdPricing = {
-            common: 0.1,    // $100
-            rare: 0.2,      // $500
-            legendary: 0.3 // $1500
+            common: 100,    // $100
+            rare: 500,      // $500
+            legendary: 1500 // $1500
         };
 
         // Keep for backward compatibility - will be updated dynamically
@@ -70,9 +70,9 @@ class MintService {
         };*/
 
         this.pricing = {
-            common: new Hbar(1),  // Fallback values
-            rare: new Hbar(2),
-            legendary: new Hbar(3)
+            common: new Hbar(1400),  // Fallback values
+            rare: new Hbar(7200),
+            legendary: new Hbar(22000)
         };
 
 
